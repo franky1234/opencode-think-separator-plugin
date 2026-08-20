@@ -1,0 +1,12 @@
+{
+  "_meta": {
+    "provider": "openai",
+    "model": "o3",
+    "synthetic": true,
+    "validation": "pending",
+    "source_doc": "https://platform.openai.com/docs/guides/reasoning"
+  },
+  "role": "assistant",
+  "content": null,
+  "reasoning_content": "Step 1: consider X. Step 2: derive Y from X. Step 3: verify Y holds."
+}
