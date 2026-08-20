@@ -4,7 +4,7 @@
 
 **Goal:** Ship a public opencode TUI plugin that visually separates the model's reasoning block from its final response, provider-agnostic across Anthropic, OpenAI, Google and MiniMax, opencode-version-agnostic >= 1.15.
 
-**Architecture:** Single ESM `.js` file at `src/index.js` registers opencode plugin hooks. Detection layer (`src/detect-reasoning.js`) is a whitelist-based heuristic that scans `message.content[]` blocks (Anthropic/MiniMax style) and top-level `message.*` fields (OpenAI/Google style) for known reasoning-field names. Render layer (`src/render.js`) emits ANSI-styled output with a fixed `── Reasoning ──` header and separator. Defaults live in `src/config.js` (label `"Reasoning"`). No runtime dependencies.
+**Architecture:** Single ESM `.js` file at `src/index.js` exports BOTH a server-side `Plugin` and a TUI-side `TuiPlugin`. The server hook `experimental.chat.messages.transform` rewrites each assistant message: reasoning parts (type `reasoning`) are converted into text parts prefixed with the `── Reasoning ──` header (rendered by `src/render.js`), and the original reasoning part is removed (because it is now represented visually). The TUI hook registers a sidebar slot showing a per-session "Reasoning detected in N messages" indicator. Detection layer (`src/detect-reasoning.js`) is a whitelist-based heuristic that also scans raw message content (Anthropic/MiniMax style `content[]` blocks, OpenAI/Google top-level fields) as a defense-in-depth for providers that don't emit `type:"reasoning"` parts. Render layer (`src/render.js`) emits the formatted string. Defaults live in `src/config.js` (label `"Reasoning"`). No runtime dependencies.
 
 **Tech Stack:** Node.js >=18 (ESM only, no TypeScript), `node --test` for unit tests, no dependencies, opencode plugin API >= 1.15, ANSI escapes for terminal styling.
 
@@ -31,6 +31,23 @@
 - **Render**: header `── Reasoning ──` (bold + underline), reasoning body dim + 2-space indented, blank-line separator, response body 2-space indented with no dim.
 - **Backward compatibility**: v0.x may break; v1.0.0 locks the contract.
 - **License**: MIT. Repo: `github.com/franky1234/think-separator-plugin`.
+
+---
+
+## Pivote arquitectónico (descubierto durante Task 0)
+
+La versión inicial de este plan asumía que existía un hook `onMessageRender` que permitía transformar el render del TUI en vivo. La investigación de Task 0 contra el código fuente de `anomalyco/opencode` (branch `dev`, paquete `packages/plugin/src/`) demostró que ese hook **no existe** en opencode 1.18.18.
+
+**Lo que SÍ existe** y permite el comportamiento deseado:
+
+1. `experimental.chat.messages.transform` (server-side) — recibe todos los mensajes antes de que se persistan y permite mutar sus partes. Aquí reescribimos cada parte `type: "reasoning"` como un text part con header visual.
+2. `TuiPlugin` API + `slots.register` (TUI-side) — permite inyectar componentes JSX en slots de la UI para indicadores.
+3. `experimental.text.complete` (server-side) — alternativa para prefijar texto en partes individuales (no usado en MVP, queda como `DEFER`).
+
+**Implicaciones**:
+- El reasoning se transforma **al momento de persistirse**, no al renderizarse en vivo. Esto significa que después de cargar el plugin, los mensajes anteriores NO son re-procesados (es un trade-off aceptable para MVP).
+- El render visual es texto plano (no hay colapso interactivo) — esto matchea el non-goal "Render colapsable interactivo" del spec original.
+- El plugin funciona sin upstream patches. No requiere esperar features futuras.
 
 ---
 
@@ -516,63 +533,160 @@ export function mergeConfig(userConfig) {
 
 **Files:**
 - Create: `src/index.js`
+- Create: `src/tui.js` (TUI-side companion)
 - Create: `examples/opencode.json`
 
 **Depends on:** Tasks 0 (API surface), 2 (detect), 3 (render), 4 (config).
 
-**Goal:** Wire the modules into a real opencode plugin export, following the exact API shape documented in Task 0.
+**Goal:** Wire the modules into a real opencode plugin that exports BOTH a server-side `Plugin` and a TUI-side `TuiPlugin`. The server hook transforms reasoning parts into visually-prefixed text parts; the TUI hook registers a sidebar indicator.
+
+**Architecture rationale:**
+- Server-side `experimental.chat.messages.transform` runs BEFORE persistence, so reasoning content is rewritten in-place once per message. No streaming hacks needed.
+- TUI-side `slots.register` injects a non-intrusive indicator in the existing sidebar (no new UI panels, no breaking layout).
+- Both exports share config via `mergeConfig()` so a single user config controls both sides.
 
 **Steps:**
-- [ ] **Step 1:** Re-read `docs/PLUGIN_API.md` §1 (plugin export shape) and §2 (available hooks). Confirm the exact export form and the hook name(s) we will register against.
-- [ ] **Step 2:** Write `src/index.js`. Structure (the exact export form follows Task 0's finding — the snippet below is the canonical shape; adjust the hook name and callback signature to match whatever Task 0 confirmed):
+- [ ] **Step 1:** Re-read `docs/PLUGIN_API.md` §1 (Plugin vs TuiPlugin dual-export) and §2 (hooks `experimental.chat.messages.transform` + `TuiPlugin.slots.register`). Confirm exact signatures.
+
+- [ ] **Step 2:** Write `src/index.js` (server-side Plugin):
 
 ```js
 /**
- * think-separator-plugin — opencode TUI plugin entry.
+ * think-separator-plugin — server-side entry.
  *
- * Detects reasoning blocks in assistant messages and renders them with a
- * visual separator above the final response.
+ * Rewrites reasoning parts in assistant messages so that the reasoning
+ * block is rendered with a visual separator above the final response.
+ *
+ * Mechanism: experimental.chat.messages.transform receives all messages
+ * before persistence. For each assistant message, any `type: "reasoning"`
+ * part is converted into a text part prefixed with `── Reasoning ──`,
+ * dim-formatted via src/render.js. The original reasoning part is removed
+ * because it is now represented visually inside the text part.
+ *
+ * Defense-in-depth: providers that emit reasoning in a non-standard shape
+ * (e.g. Anthropic/MiniMax `content[]` blocks with type "thinking",
+ * OpenAI `reasoning_content` top-level field) are also detected and
+ * surfaced, even though opencode normalizes most providers to
+ * `type: "reasoning"` parts internally.
  */
 
 import { detectReasoning } from './detect-reasoning.js';
-import { compose, renderResponse } from './render.js';
-import { defaultConfig, mergeConfig } from './config.js';
+import { renderReasoning } from './render.js';
+import { mergeConfig } from './config.js';
 
-export const ThinkSeparator = async ({ project, client, $, directory, worktree }) => {
-  const config = mergeConfig({});
+export const ThinkSeparator = async (input, options) => {
+  const config = mergeConfig(options || {});
   return {
-    label: 'think-separator',
-    description: 'Visually separates model reasoning from final response',
-
-    async onMessageRender(message, output) {
-      if (!message || message.role !== 'assistant') return;
-      const detection = detectReasoning(message);
-      if (!detection) return;
-
-      const responseText = extractResponseText(message);
-      const reasoning = compose(detection, responseText, config.label);
-
-      output.replace(reasoning);
-    }
+    'experimental.chat.messages.transform': async (_hookInput, output) => {
+      for (const msg of output.messages) {
+        if (msg.info.role !== 'assistant') continue;
+        transformMessage(msg, config.label);
+      }
+    },
   };
 };
 
-function extractResponseText(message) {
-  if (typeof message.content === 'string') return message.content;
-  if (Array.isArray(message.content)) {
-    return message.content
-      .filter((b) => b && typeof b === 'object' && b.type === 'text')
-      .map((b) => b.text)
+function transformMessage(msg, label) {
+  const parts = msg.parts;
+
+  // Case 1: opencode-native `type: "reasoning"` parts (most providers).
+  // Convert each into a text part with header + dim body, drop the original.
+  const reasoningTexts = [];
+  const remaining = [];
+  for (const part of parts) {
+    if (part && part.type === 'reasoning' && typeof part.text === 'string' && part.text.length > 0) {
+      reasoningTexts.push(part.text);
+    } else {
+      remaining.push(part);
+    }
+  }
+
+  if (reasoningTexts.length > 0) {
+    const reasoningBlock = reasoningTexts
+      .map((t) => renderReasoning(t, label))
       .join('\n');
+    const newTextPart = {
+      ...remaining[0],
+      type: 'text',
+      text: reasoningBlock + extractTextFromParts(remaining),
+    };
+    msg.parts = [newTextPart, ...remaining.slice(1)];
+    return;
   }
-  if (message.content && typeof message.content === 'object' && Array.isArray(message.content.parts)) {
-    return message.content.parts.map((p) => (p && p.text) || '').join('\n');
-  }
-  return '';
+
+  // Case 2: provider-native reasoning shape (defense-in-depth).
+  // Reconstruct a synthetic message shape and pass to detectReasoning.
+  const synthetic = {
+      content: parts
+        .filter((p) => p && (p.type === 'text' || p.type === 'thinking'))
+        .map((p) => ({ type: p.type === 'thinking' ? 'thinking' : 'text', [p.type === 'thinking' ? 'thinking' : 'text']: p.text })),
+    };
+  const detection = detectReasoning(synthetic);
+  if (!detection) return;
+  const reasoningBlock = renderReasoning(detection.reasoning, label);
+  const existingText = extractTextFromParts(parts);
+  msg.parts = [
+    { ...parts[0], type: 'text', text: reasoningBlock + existingText },
+    ...parts.slice(1),
+  ];
+}
+
+function extractTextFromParts(parts) {
+  return parts
+    .filter((p) => p && p.type === 'text' && typeof p.text === 'string')
+    .map((p) => p.text)
+    .join('\n');
 }
 ```
 
-- [ ] **Step 3:** Write `examples/opencode.json`:
+- [ ] **Step 3:** Write `src/tui.js` (TUI-side TuiPlugin):
+
+```js
+/**
+ * think-separator-plugin — TUI-side entry.
+ *
+ * Injects a small indicator into the session sidebar showing how many
+ * assistant messages in this session contained reasoning blocks.
+ */
+
+import { mergeConfig } from './config.js';
+
+export const ThinkSeparatorTui = async (api, options, meta) => {
+  const config = mergeConfig(options || {});
+
+  return {
+    slots: {
+      register: [
+        {
+          name: 'think-separator-indicator',
+          render: () => {
+            // Read current session messages; count those with reasoning.
+            const current = api.route.current;
+            if (current.name !== 'session') return null;
+            const sessionID = current.params.sessionID;
+            const messages = api.state.session.messages(sessionID);
+            const reasoningCount = messages.filter((m) =>
+              m.info.role === 'assistant' &&
+              Array.isArray(m.parts) &&
+              m.parts.some((p) => p && p.type === 'text' && p.text.includes(config.label))
+            ).length;
+            if (reasoningCount === 0) return null;
+            return {
+                type: 'box',
+                children: [{
+                  type: 'text',
+                  content: `${config.label}: ${reasoningCount} message${reasoningCount === 1 ? '' : 's'}`,
+                }],
+              };
+          },
+        },
+      ],
+    },
+  };
+};
+```
+
+- [ ] **Step 4:** Write `examples/opencode.json`:
 
 ```json
 {
@@ -582,8 +696,8 @@ function extractResponseText(message) {
 }
 ```
 
-- [ ] **Step 4:** Validate by `node --check src/index.js` (syntax check, no runtime).
-- [ ] **Step 5:** Commit: `git add src/index.js examples/opencode.json && git commit -m "feat: plugin entry wires detect + render + config"`.
+- [ ] **Step 5:** Validate by `node --check src/index.js && node --check src/tui.js` (syntax checks, no runtime).
+- [ ] **Step 6:** Commit: `git add src/index.js src/tui.js examples/opencode.json && git commit -m "feat: plugin entry wires server (messages.transform) + TUI (slots)"`.
 
 ---
 
@@ -677,15 +791,21 @@ exec opencode "$@"
 
 **Steps:**
 - [ ] **Step 1:** Run `npm test` and confirm 14 tests pass (6 detect + 4 render + 4 config), 0 fail.
-- [ ] **Step 2:** Run `bash -n bin/dev.sh && node --check src/index.js` — both succeed silently.
+- [ ] **Step 2:** Run `bash -n bin/dev.sh && node --check src/index.js && node --check src/tui.js` — all succeed silently.
 - [ ] **Step 3:** Verify `git status` is clean.
 - [ ] **Step 4:** Verify all 5 fixtures parse as JSON and have `_meta.synthetic: true`:
   ```bash
   for f in test/fixtures/*.json; do node -e "const m = JSON.parse(require('fs').readFileSync('$f','utf8')); console.log('$f', m._meta && m._meta.synthetic === true ? 'OK' : 'MISSING META')"; done
   ```
   Expected: every fixture prints `OK`.
-- [ ] **Step 5:** Tag the release: `git tag -a v0.1.0 -m "think-separator-plugin v0.1.0 MVP"`.
-- [ ] **Step 6:** Save plan-completion memory to Engram with `topic_key: think-separator-plan-complete` summarizing commits, test count, deferred items (real fixture capture, multi-version matrix expansion).
+- [ ] **Step 5:** Manual smoke (post-tag): load plugin in a real opencode session against a reasoning-capable model (Anthropic Sonnet 4.5 or o3) and visually confirm:
+  - Reasoning block appears with `── Reasoning ──` header.
+  - Reasoning body is dim.
+  - Final response follows with separator.
+  - `/thinking` toggle still works.
+  - Export (ctrl+x x) preserves the separator.
+- [ ] **Step 6:** Tag the release: `git tag -a v0.1.0 -m "think-separator-plugin v0.1.0 MVP"`.
+- [ ] **Step 7:** Save plan-completion memory to Engram with `topic_key: think-separator-plan-complete` summarizing commits, test count, architecture pivot (server-side messages.transform + TUI-side slots), deferred items (real fixture capture, multi-version matrix expansion, interactive collapse).
 
 ---
 
