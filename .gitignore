@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.harness/nah-denied.jsonl
+.env
+.env.*
+.opencode/skills/
+.opencode/package.json
+.opencode/package-lock.json
+.superpowers/
+*.db
+*.sqlite
+.DS_Store

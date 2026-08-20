@@ -1,0 +1,39 @@
+# .harness/models.yaml — single source of truth for model selection.
+#
+# Roles used by generate-agents.sh and recommended for hand-written agents:
+#
+#   primary     → orchestrator, default primary agent
+#   small       → titles, summaries, compaction (used by small_model config)
+#   dev_coding  → dev agents with blast_radius: high (Pro-tier for coding/agentic)
+#   dev_light   → dev agents with blast_radius: low|medium (Flash-tier for routine work)
+#   qa          → QA subagent — INTENTIONALLY a different family than dev_coding
+#                 to catch blind spots the dev model shares with itself.
+#
+# Runtime override via env vars (no need to edit this file):
+#   export HARNESS_MODEL_PRIMARY="opencode-go/glm-5.2"
+#   export HARNESS_MODEL_SMALL="minimax/MiniMax-M2.7-highspeed"
+#   export HARNESS_MODEL_DEV_CODING="opencode-go/kimi-k2.7-code"
+#   export HARNESS_MODEL_DEV_LIGHT="opencode-go/deepseek-v4-flash"
+#   export HARNESS_MODEL_QA="opencode-go/deepseek-v4-pro"
+#
+# Selection principles (rationale):
+#   - primary   : frontier coding/agentic, 1M ctx. Pay per token — low volume per session.
+#   - small     : 4× cheaper than primary for lightweight tasks like session titles.
+#   - dev_coding: top coding/agentic quality for actual implementation work.
+#   - dev_light : same pricing tier as small — fast/cheap for routine sub-tasks.
+#   - qa        : MUST be a different family/vendor than dev_coding so the qa model
+#                 can spot what the dev model is blind to. Same model = same biases.
+#
+# Diversity principle: dev and qa come from different teams/families.
+#   - dev_coding: High-Flyer / DeepSeek family
+#   - qa        : Moonshot AI (Kimi) — different arch, different biases, top-tier
+#
+# Price/token/quality/perf are analyzed per role. See AGENTS.md "Model Selection".
+roles:
+  primary:      "minimax/MiniMax-M3"
+  architect:    "minimax/MiniMax-M3"
+  small:        "opencode-go/deepseek-v4-flash"
+  dev_coding:   "opencode-go/deepseek-v4-pro"
+  dev_light:    "opencode-go/deepseek-v4-flash"
+  qa:           "opencode-go/kimi-k2.7-code"
+  code_reviewer: "opencode-go/mimo-v2.5-pro"

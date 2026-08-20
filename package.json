@@ -1,0 +1,46 @@
+{
+  "name": "think-separator-plugin",
+  "version": "0.1.0",
+  "description": "Opencode TUI plugin that visually separates model reasoning blocks from responses. Agnostic to provider (Anthropic, OpenAI, Google, MiniMax).",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test test/",
+    "test:watch": "node --test --watch test/",
+    "lint": "echo 'TODO: add biome or eslint in FASE 2' && exit 0",
+    "harness:check": "bash .harness/add-skills.sh",
+    "harness:regen": "bash .harness/generate-agents.sh --force --no-backup",
+    "harness:dev": "bash bin/harness-load.sh"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "tui",
+    "reasoning",
+    "thinking",
+    "anthropic",
+    "openai",
+    "google",
+    "minimax"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/franky1234/think-separator-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/franky1234/think-separator-plugin/issues"
+  },
+  "homepage": "https://github.com/franky1234/think-separator-plugin#readme"
+}

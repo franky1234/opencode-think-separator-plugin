@@ -1,0 +1,58 @@
+defaults:
+  filesystem_read: allow
+  filesystem_write: allow
+  filesystem_delete: ask
+  network_outbound: ask
+  lang_exec: allow
+  package_install: ask
+  agent_delegate: allow
+
+agents:
+  orchestrator:
+    description: "Read-only planner, delegates to sub-agents"
+    filesystem_write: deny
+    filesystem_delete: deny
+    lang_exec: deny
+    network_outbound: deny
+    package_install: deny
+
+  dev-think-separator:
+    description: "Full coding power for plugin implementation"
+    filesystem_read: allow
+    filesystem_write: allow
+    filesystem_delete: ask
+    lang_exec: allow
+    network_outbound: ask
+    package_install: ask
+    agent_delegate: deny
+
+  qa:
+    description: "Runs npm test, no edits, no installs"
+    filesystem_write: deny
+    filesystem_delete: deny
+    network_outbound: deny
+    package_install: deny
+    agent_delegate: deny
+
+  code-reviewer:
+    description: "Read-only code reviewer, no edits, no bash"
+    filesystem_write: deny
+    filesystem_delete: deny
+    network_outbound: deny
+    package_install: deny
+    lang_exec: deny
+    agent_delegate: deny
+
+  architect:
+    description: "System architect for phase 0 specs and schema design"
+    filesystem_write: deny
+    filesystem_delete: deny
+    network_outbound: deny
+    package_install: deny
+    lang_exec: deny
+    agent_delegate: deny
+
+unattended_mode:
+  enabled_when_env: "NAH_UNATTENDED=1"
+  resolve_ask_as: deny
+  log_denied_to: ".harness/nah-denied.jsonl"

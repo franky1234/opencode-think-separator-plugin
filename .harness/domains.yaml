@@ -1,0 +1,12 @@
+project:
+  name: think-separator-plugin
+  topology: single-package
+
+domains:
+  - name: think-separator
+    path: .
+    capabilities: [javascript, nodejs, opencode-plugin]
+    checks:
+      - { id: unit, cmd: "npm test" }
+    autonomous_loop: true
+    blast_radius: high
