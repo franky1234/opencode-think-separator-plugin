@@ -93,6 +93,17 @@ curl https://api.MiniMax.chat/v1/chat/completions \
 
 After replacing any fixture, update its `_meta.synthetic` to `false` and `_meta.validation` to `"captured"`.
 
+## Validation TODO (required before v1.0.0)
+
+This is **MANDATORY** before tagging v1.0.0:
+
+1. Replace each of the 4 provider fixtures with a real capture (Anthropic, OpenAI, Google, MiniMax).
+2. The control fixture stays as-is (no real capture needed — there is no reasoning to capture).
+3. Confirm `npm test` still passes against the real captures. If detection breaks on a real shape, the whitelist in `src/detect-reasoning.js` may need updating.
+4. Update `_meta.synthetic: false` and `_meta.validation: "captured"` on each replaced fixture.
+5. Add `_meta.captured_at` with the ISO 8601 capture date.
+6. See [CONTRIBUTING.md](../../CONTRIBUTING.md) for the full replacement procedure.
+
 ## Validation script
 
 A test helper script will verify that every fixture parses as JSON and has the required `_meta` block:
