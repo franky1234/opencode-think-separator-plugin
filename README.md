@@ -6,29 +6,35 @@ Provider-agnostic — works with Anthropic (Claude), OpenAI (o3, o1), Google (Ge
 
 ## Install
 
-### From source (dev path)
+### Recommended: edit `~/.config/opencode/opencode.json`
 
-```bash
-git clone https://github.com/franky1234/opencode-think-separator-plugin.git
-cd opencode-think-separator-plugin
-./bin/dev.sh
-```
-
-This script symlinks the plugin into `~/.config/opencode/plugins/` and starts opencode.
-
-### From npm (once published)
-
-```bash
-npm install -g opencode-think-separator-plugin
-```
-
-Then add to your `~/.config/opencode/opencode.json`:
+Add the plugin to your existing config:
 
 ```json
 {
   "plugin": ["opencode-think-separator-plugin"]
 }
 ```
+
+opencode auto-installs npm packages on startup ([docs](https://opencode.ai/docs/plugins/#how-plugins-are-installed)). No `npm install -g` step required — the package is fetched into `~/.cache/opencode/node_modules/` at first run.
+
+### Alternative: one-shot installer
+
+```bash
+npx opencode-think-separator-plugin-install
+```
+
+This writes the plugin entry into your `opencode.json` and prints a "restart opencode" prompt.
+
+### From source (dev path)
+
+```bash
+git clone https://github.com/franky1234/think-separator-plugin.git
+cd think-separator-plugin
+./bin/dev.sh
+```
+
+`bin/dev.sh` symlinks the source into `~/.config/opencode/plugins/` and starts opencode.
 
 ## How it works
 
@@ -78,10 +84,9 @@ Unknown keys in the options are silently ignored (forward-compat).
 
 See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the full matrix and expansion plan.
 
-## Known limitations (v0.1.0)
+## Known limitations (v0.2.0)
 
 - **Reasoning is rewritten at message-complete time**, not during streaming. Reasoning content only becomes visible after the message finishes generating.
-- **The TUI sidebar indicator** is stubbed (returns `null`) because the canonical JSX shape requires the opencode host's `@opentui/solid` transform, which is unverified for plain `.js` plugin files. The headline feature (the visual separator in messages) works regardless. See [progress.md TODO](.superpowers/sdd/think-separator-0.1.0/progress.md) for the follow-up.
 - **Fixtures are synthetic**, not captured from real provider responses. They will be replaced before v1.0.0 — see [test/fixtures/README.md](test/fixtures/README.md).
 
 ## Contributing
