@@ -1,0 +1,28 @@
+# Dev / harness / superpowers internals
+.harness/
+.opencode/
+.superpowers/
+docs/
+test/
+examples/
+
+# Dev-only bin scripts (bin/install.sh IS shipped via files whitelist)
+bin/dev.sh
+bin/harness-load.sh
+
+# Env + local config
+.env
+.env.*
+opencode.json
+
+# Orphan + transient
+q.json
+
+# Lock files
+package-lock.json
+*.lock
+
+# Build artifacts
+dist/
+node_modules/
+*.log
