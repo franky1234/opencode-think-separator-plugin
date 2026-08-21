@@ -7,8 +7,12 @@
   "exports": {
     ".": "./src/index.js"
   },
+  "bin": {
+    "opencode-think-separator-plugin-install": "bin/install.sh"
+  },
   "files": [
     "src/",
+    "bin/install.sh",
     "README.md",
     "LICENSE"
   ],
@@ -16,6 +20,7 @@
     "test": "node --test test/*.test.js",
     "test:watch": "node --test --watch test/*.test.js",
     "lint": "echo 'TODO: add biome or eslint in FASE 2' && exit 0",
+    "prepublishOnly": "node --check src/index.js && npm test",
     "harness:check": "bash .harness/add-skills.sh",
     "harness:regen": "bash .harness/generate-agents.sh --force --no-backup",
     "harness:dev": "bash bin/harness-load.sh"
@@ -32,7 +37,9 @@
     "anthropic",
     "openai",
     "google",
-    "minimax"
+    "minimax",
+    "plugin",
+    "opencode-ai"
   ],
   "license": "MIT",
   "repository": {
