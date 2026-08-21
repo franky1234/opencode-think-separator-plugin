@@ -1,9 +1,9 @@
-# think-separator-plugin — Execution Plan
+# opencode-think-separator-plugin — Execution Plan
 
 Opencode TUI plugin that visually separates the model's reasoning block (`<think>`, `reasoning`, `thoughts`, etc.) from its final response. Provider-agnostic (Anthropic, OpenAI, Google, MiniMax) and opencode-version-agnostic (≥ 1.15).
 
-**Repo**: https://github.com/franky1234/think-separator-plugin
-**Path**: `/home/franklin/Desktop/REPO/klassapp/think-separator-plugin/`
+**Repo**: https://github.com/franky1234/opencode-think-separator-plugin
+**Path**: `/home/franklin/Desktop/REPO/klassapp/opencode-think-separator-plugin/`
 **Version**: `0.1.0` (MVP)
 **License**: MIT
 
@@ -153,7 +153,7 @@ Bootstrap del proyecto con harness completo:
 
 - **4.1** README completo (instalación, ejemplos, screenshots)
 - **4.2** LICENSE (MIT) + CONTRIBUTING.md
-- **4.3** GitHub repo público en `github.com/franky1234/think-separator-plugin`
+- **4.3** GitHub repo público en `github.com/franky1234/opencode-think-separator-plugin`
 - **4.4** Push + tag `v0.1.0`
 - **4.5** `npm publish --access public` (requiere npm login)
 - **4.6** Smoke test: instalar vía npm y verificar carga

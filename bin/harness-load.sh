@@ -1,5 +1,5 @@
 #!/bin/bash
-# bin/harness-load.sh — dev launcher para think-separator-plugin
+# bin/harness-load.sh — dev launcher para opencode-think-separator-plugin
 #
 # Arranca opencode con el harness del proyecto. El harness se compone de:
 #   - .opencode/agent/*.md    → orchestrator, dev, qa, architect, code-reviewer

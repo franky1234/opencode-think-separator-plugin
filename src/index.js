@@ -1,5 +1,5 @@
 /**
- * think-separator-plugin — server-side entry.
+ * opencode-think-separator-plugin — server-side entry.
  *
  * Rewrites reasoning parts in assistant messages so that the reasoning
  * block is rendered with a visual separator above the final response.
@@ -95,6 +95,6 @@ function extractTextFromParts(parts) {
 }
 
 export default {
-  id: 'think-separator-plugin',
+  id: 'opencode-think-separator-plugin',
   server: ThinkSeparator,
 };

@@ -1,4 +1,4 @@
-# think-separator-plugin — Project Standards
+# opencode-think-separator-plugin — Project Standards
 
 ## Scope
 Opencode TUI plugin that visually separates the model's reasoning block (`<think>`, `reasoning`, `thoughts`, etc.) from its final response. Plugin is rendered inside the opencode TUI as a styled block with header label and separator.
@@ -34,7 +34,7 @@ Opencode TUI plugin that visually separates the model's reasoning block (`<think
 - Do NOT save: every tool invocation, intermediate test output, transient state
 
 ## Domains
-- Single domain: `think-separator-plugin`
+- Single domain: `opencode-think-separator-plugin`
 - If a second domain emerges, edit `.harness/domains.yaml` and run `bash .harness/generate-agents.sh`
 
 ## Harness working files (do not touch)

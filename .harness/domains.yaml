@@ -1,5 +1,5 @@
 project:
-  name: think-separator-plugin
+  name: opencode-think-separator-plugin
   topology: single-package
 
 domains:

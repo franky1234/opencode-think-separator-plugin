@@ -8,7 +8,7 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PLUGIN_DIR="${OPENCODE_PLUGIN_DIR:-$HOME/.config/opencode/plugins}"
-SERVER_LINK="$PLUGIN_DIR/think-separator-plugin.js"
+SERVER_LINK="$PLUGIN_DIR/opencode-think-separator-plugin.js"
 
 mkdir -p "$PLUGIN_DIR"
 

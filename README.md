@@ -1,4 +1,4 @@
-# think-separator-plugin
+# opencode-think-separator-plugin
 
 An opencode TUI plugin that visually separates the model's reasoning block from its final response.
 
@@ -9,8 +9,8 @@ Provider-agnostic — works with Anthropic (Claude), OpenAI (o3, o1), Google (Ge
 ### From source (dev path)
 
 ```bash
-git clone https://github.com/franky1234/think-separator-plugin.git
-cd think-separator-plugin
+git clone https://github.com/franky1234/opencode-think-separator-plugin.git
+cd opencode-think-separator-plugin
 ./bin/dev.sh
 ```
 
@@ -19,14 +19,14 @@ This script symlinks the plugin into `~/.config/opencode/plugins/` and starts op
 ### From npm (once published)
 
 ```bash
-npm install -g think-separator-plugin
+npm install -g opencode-think-separator-plugin
 ```
 
 Then add to your `~/.config/opencode/opencode.json`:
 
 ```json
 {
-  "plugin": ["think-separator-plugin"]
+  "plugin": ["opencode-think-separator-plugin"]
 }
 ```
 
@@ -62,7 +62,7 @@ Override the header label by passing options to the plugin in `opencode.json`:
 ```json
 {
   "plugin": [
-    ["think-separator-plugin", { "label": "Thinking" }]
+    ["opencode-think-separator-plugin", { "label": "Thinking" }]
   ]
 }
 ```

@@ -1,4 +1,4 @@
-# think-separator-plugin Architecture
+# opencode-think-separator-plugin Architecture
 
 This document describes the plugin's contract, detection heuristic, render pipeline, and configuration API as of v0.1.0.
 
@@ -143,7 +143,7 @@ TUI-side slot reads messages, shows count indicator
 ## 4. Config API
 
 ```js
-import { defaultConfig, mergeConfig } from 'think-separator-plugin';
+import { defaultConfig, mergeConfig } from 'opencode-think-separator-plugin';
 
 mergeConfig({ label: 'Thinking' });
 // -> { label: 'Thinking' }
