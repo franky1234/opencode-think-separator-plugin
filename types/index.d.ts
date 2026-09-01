@@ -87,6 +87,8 @@ export interface OpenCodeMessage {
 export interface PluginConfig {
     /** Header label shown above the reasoning block. */
     label: string;
+    /** Render strategy applied to extracted reasoning (see `RenderStyle`). */
+    style: RenderStyle;
 }
 
 /**
@@ -96,6 +98,13 @@ export interface PluginConfig {
 export interface UserConfig {
     /** Optional label override. Falls back to `defaultConfig.label` when omitted. */
     label?: string;
+    /**
+     * Optional render-style override. Falls back to `defaultConfig.style`
+     * (`"markdown"`) when omitted. Unknown values are silently ignored by
+     * `mergeConfig` for forward-compatibility — see `RenderStyle` for the
+     * allowed set. Values are case-sensitive.
+     */
+    style?: RenderStyle;
 }
 
 /**
