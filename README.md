@@ -42,8 +42,7 @@ When the LLM produces a response that includes reasoning (chain-of-thought, exte
 
 ```markdown
 > ### ── Reasoning ──
->
-> _The model thinks step by step here..._
+> *The model thinks step by step here...*
 
 This is the final, visible response.
 ```

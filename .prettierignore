@@ -5,3 +5,5 @@ dist
 .superpowers
 *.log
 q.json
+*.md
+docs/
