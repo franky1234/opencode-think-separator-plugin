@@ -5,6 +5,12 @@
 docs/
 test/
 examples/
+upgrade/
+
+# Internal docs & guidelines
+PLAN.md
+AGENTS.md
+CONTRIBUTING.md
 
 # Dev-only bin scripts (bin/install.sh IS shipped via files whitelist)
 bin/dev.sh
