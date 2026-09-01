@@ -1,12 +1,12 @@
 {
-  "_meta": {
-    "provider": "google",
-    "model": "gemini-2.5-pro",
-    "synthetic": true,
-    "validation": "pending",
-    "source_doc": "https://ai.google.dev/gemini-api/docs/thinking"
-  },
-  "role": "model",
-  "content": { "parts": [{ "text": "Final answer text." }] },
-  "thoughts": "Internal chain of thought goes here. I analyzed the problem across three dimensions."
+    "_meta": {
+        "provider": "google",
+        "model": "gemini-2.5-pro",
+        "synthetic": true,
+        "validation": "pending",
+        "source_doc": "https://ai.google.dev/gemini-api/docs/thinking"
+    },
+    "role": "model",
+    "content": {"parts": [{"text": "Final answer text."}]},
+    "thoughts": "Internal chain of thought goes here. I analyzed the problem across three dimensions."
 }

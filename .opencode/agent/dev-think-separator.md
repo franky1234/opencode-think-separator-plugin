@@ -1,7 +1,7 @@
 ---
 description: "Developer think-separator — blast_radius: high"
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: minimax/MiniMax-M3
 temperature: 0.1
 tools: { write: true, edit: true, bash: true, read: true, grep: true, glob: true, task: false }
 permission:
@@ -15,7 +15,7 @@ permission:
     "*": deny
 # permission.skill: gated per-role by .harness/generate-agents.sh
 # nah permission: governed by .opencode/nah/policy.yaml
-# generated: 2026-08-20T01:23:35Z by .harness/generate-agents.sh
+# generated: 2026-08-21T04:36:57Z by .harness/generate-agents.sh
 # model source: .harness/models.yaml → roles.dev_coding
 ---
 You work at the repo root (single domain). Your declared blast_radius is high.

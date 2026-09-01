@@ -1,53 +1,59 @@
 {
-  "name": "opencode-think-separator-plugin",
-  "version": "0.2.0",
-  "description": "Opencode TUI plugin that visually separates model reasoning blocks from responses. Agnostic to provider (Anthropic, OpenAI, Google, MiniMax).",
-  "type": "module",
-  "main": "src/index.js",
-  "exports": {
-    ".": "./src/index.js"
-  },
-  "bin": {
-    "opencode-think-separator-plugin-install": "bin/install.sh"
-  },
-  "files": [
-    "src/",
-    "bin/install.sh",
-    "README.md",
-    "LICENSE"
-  ],
-  "scripts": {
-    "test": "node --test test/*.test.js",
-    "test:watch": "node --test --watch test/*.test.js",
-    "lint": "echo 'TODO: add biome or eslint in FASE 2' && exit 0",
-    "prepublishOnly": "node --check src/index.js && npm test",
-    "harness:check": "bash .harness/add-skills.sh",
-    "harness:regen": "bash .harness/generate-agents.sh --force --no-backup",
-    "harness:dev": "bash bin/harness-load.sh"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "opencode",
-    "opencode-plugin",
-    "tui",
-    "reasoning",
-    "thinking",
-    "anthropic",
-    "openai",
-    "google",
-    "minimax",
-    "plugin",
-    "opencode-ai"
-  ],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/franky1234/think-separator-plugin.git"
-  },
-  "bugs": {
-    "url": "https://github.com/franky1234/think-separator-plugin/issues"
-  },
-  "homepage": "https://github.com/franky1234/think-separator-plugin#readme"
+    "name": "opencode-think-separator-plugin",
+    "version": "0.2.0",
+    "description": "Opencode TUI plugin that visually separates model reasoning blocks from responses. Agnostic to provider (Anthropic, OpenAI, Google, MiniMax).",
+    "type": "module",
+    "main": "src/index.js",
+    "exports": {
+        ".": "./src/index.js"
+    },
+    "bin": {
+        "opencode-think-separator-plugin-install": "bin/install.sh"
+    },
+    "files": [
+        "src/",
+        "bin/install.sh",
+        "README.md",
+        "LICENSE"
+    ],
+    "scripts": {
+        "test": "node --test test/*.test.js",
+        "test:watch": "node --test --watch test/*.test.js",
+        "lint": "echo 'TODO: add biome or eslint in FASE 2' && exit 0",
+        "format": "npx prettier --write .",
+        "format:check": "npx prettier --check .",
+        "prettier:fix": "npx prettier --write .",
+        "prepublishOnly": "node --check src/index.js && npm test",
+        "harness:check": "bash .harness/add-skills.sh",
+        "harness:regen": "bash .harness/generate-agents.sh --force --no-backup",
+        "harness:dev": "bash bin/harness-load.sh"
+    },
+    "devDependencies": {
+        "prettier": "^3.5.2"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "keywords": [
+        "opencode",
+        "opencode-plugin",
+        "tui",
+        "reasoning",
+        "thinking",
+        "anthropic",
+        "openai",
+        "google",
+        "minimax",
+        "plugin",
+        "opencode-ai"
+    ],
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/franky1234/think-separator-plugin.git"
+    },
+    "bugs": {
+        "url": "https://github.com/franky1234/think-separator-plugin/issues"
+    },
+    "homepage": "https://github.com/franky1234/think-separator-plugin#readme"
 }

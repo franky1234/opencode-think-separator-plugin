@@ -10,25 +10,25 @@ Every fixture carries a top-level `_meta` block:
 
 ```json
 {
-  "_meta": {
-    "provider": "...",
-    "model": "...",
-    "synthetic": true,
-    "validation": "pending",
-    "source_doc": "..."
-  }
+    "_meta": {
+        "provider": "...",
+        "model": "...",
+        "synthetic": true,
+        "validation": "pending",
+        "source_doc": "..."
+    }
 }
 ```
 
 ## Fixtures
 
-| File | Provider | Model | Reasoning shape | Purpose |
-|---|---|---|---|---|
-| `anthropic-thinking.json` | Anthropic | claude-sonnet-4.5 | `content[]` block with `type:"thinking"` | Anthropic native shape (also normalized to `type:"reasoning"` parts by opencode) |
-| `openai-reasoning.json` | OpenAI | o3 | top-level `reasoning_content` string | OpenAI reasoning model shape |
-| `google-thoughts.json` | Google | gemini-2.5-pro | top-level `thoughts` string | Gemini thinking shape |
-| `minimax-thinking.json` | MiniMax | MiniMax-M3 | `content[]` block with `type:"thinking"` | MiniMax native shape |
-| `no-reasoning-control.json` | OpenAI | gpt-4o | none | Negative control — must NOT detect reasoning |
+| File                        | Provider  | Model             | Reasoning shape                          | Purpose                                                                          |
+| --------------------------- | --------- | ----------------- | ---------------------------------------- | -------------------------------------------------------------------------------- |
+| `anthropic-thinking.json`   | Anthropic | claude-sonnet-4.5 | `content[]` block with `type:"thinking"` | Anthropic native shape (also normalized to `type:"reasoning"` parts by opencode) |
+| `openai-reasoning.json`     | OpenAI    | o3                | top-level `reasoning_content` string     | OpenAI reasoning model shape                                                     |
+| `google-thoughts.json`      | Google    | gemini-2.5-pro    | top-level `thoughts` string              | Gemini thinking shape                                                            |
+| `minimax-thinking.json`     | MiniMax   | MiniMax-M3        | `content[]` block with `type:"thinking"` | MiniMax native shape                                                             |
+| `no-reasoning-control.json` | OpenAI    | gpt-4o            | none                                     | Negative control — must NOT detect reasoning                                     |
 
 ## Why synthetic?
 
@@ -43,6 +43,7 @@ Real provider responses can only be captured by calling each provider's API with
 Before v1.0.0 we want to replace each synthetic fixture with a real captured response. The procedure:
 
 ### Anthropic
+
 ```bash
 curl https://api.anthropic.com/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" \
@@ -55,9 +56,11 @@ curl https://api.anthropic.com/v1/messages \
     "messages": [{ "role": "user", "content": "Solve this step by step." }]
   }' | tee test/fixtures/anthropic-thinking.json
 ```
+
 Then strip `anthropic-ratelimit-*` headers and any auth fields from the captured body.
 
 ### OpenAI
+
 ```bash
 curl https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
@@ -70,6 +73,7 @@ curl https://api.openai.com/v1/chat/completions \
 ```
 
 ### Google
+
 ```bash
 curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=$GOOGLE_API_KEY" \
   -H "content-type: application/json" \
@@ -80,6 +84,7 @@ curl "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:gen
 ```
 
 ### MiniMax
+
 ```bash
 curl https://api.MiniMax.chat/v1/chat/completions \
   -H "Authorization: Bearer $MiniMax_API_KEY" \

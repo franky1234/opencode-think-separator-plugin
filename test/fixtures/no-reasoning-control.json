@@ -1,11 +1,11 @@
 {
-  "_meta": {
-    "provider": "openai",
-    "model": "gpt-4o",
-    "synthetic": true,
-    "validation": "pending",
-    "source_doc": "https://platform.openai.com/docs/api-reference/chat"
-  },
-  "role": "assistant",
-  "content": "Just a plain response, no reasoning."
+    "_meta": {
+        "provider": "openai",
+        "model": "gpt-4o",
+        "synthetic": true,
+        "validation": "pending",
+        "source_doc": "https://platform.openai.com/docs/api-reference/chat"
+    },
+    "role": "assistant",
+    "content": "Just a plain response, no reasoning."
 }

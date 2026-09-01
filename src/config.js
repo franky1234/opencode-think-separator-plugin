@@ -7,15 +7,15 @@
  */
 
 export const defaultConfig = Object.freeze({
-  label: 'Reasoning'
-});
+    label: "Reasoning"
+})
 
 export function mergeConfig(userConfig) {
-  const out = { ...defaultConfig };
-  if (userConfig && typeof userConfig === 'object') {
-    if (typeof userConfig.label === 'string' && userConfig.label.length > 0) {
-      out.label = userConfig.label;
+    const out = {...defaultConfig}
+    if (userConfig && typeof userConfig === "object") {
+        if (typeof userConfig.label === "string" && userConfig.label.length > 0) {
+            out.label = userConfig.label
+        }
     }
-  }
-  return out;
+    return out
 }

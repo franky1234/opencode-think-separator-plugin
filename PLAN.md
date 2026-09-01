@@ -53,13 +53,21 @@ test/
 
 ```js
 const REASONING_FIELDS = [
-  'thinking', 'reasoning', 'reasoning_content', 'reasoning_text',
-  'redacted_thinking', 'thoughts', 'cot', 'chain_of_thought',
-  'internal_monologue', 'reflection'
-];
+    "thinking",
+    "reasoning",
+    "reasoning_content",
+    "reasoning_text",
+    "redacted_thinking",
+    "thoughts",
+    "cot",
+    "chain_of_thought",
+    "internal_monologue",
+    "reflection"
+]
 ```
 
 Strategy:
+
 1. Scan `message.content[]` blocks (Anthropic/MiniMax style)
 2. Scan top-level `message.*` fields (OpenAI/Google style)
 3. Return first match with `reasoning`, `source` field name, and `kind`
@@ -79,6 +87,7 @@ Strategy:
 ### FASE H — Harness ✅ COMPLETED (commit `ab115b2`)
 
 Bootstrap del proyecto con harness completo:
+
 - AGENTS.md, .harness/{domains,models}.yaml, generate-agents.sh, add-skills.sh
 - .opencode/agent/*.md (orchestrator hand-written + 4 generados)
 - .opencode/nah/policy.yaml + .opencode/plugins/nah-policy.js (26 tests pass)
@@ -90,6 +99,7 @@ Bootstrap del proyecto con harness completo:
 ### FASE 0 — Investigación profunda (NEXT)
 
 **0.1 — Plugin API de opencode**
+
 - `read` https://opencode.ai/docs/plugins
 - `read` ~/.config/opencode/plugins/engram.ts (ejemplo real)
 - `grep` en ~/.cache/opencode/packages/opencode-ai/ para listar exports/hooks
@@ -98,12 +108,14 @@ Bootstrap del proyecto con harness completo:
 - **Output**: `docs/PLUGIN_API.md`
 
 **0.2 — Localización de serialización del `<think>`**
+
 - `grep -rn "<think>" ~/.cache/opencode/packages/opencode-ai/ --include="*.ts" --include="*.js"`
 - `read` archivo identificado
 - Determinar si el plugin puede interceptar antes o solo después de la serialización
 - **Output**: nota técnica en `docs/PLUGIN_API.md` §2 (archivo:línea)
 
 **0.3 — Recolección de fixtures de providers**
+
 - Anthropic: capturar respuesta real con `type:"thinking"` (Claude Sonnet 4.5)
 - OpenAI: capturar respuesta real con `reasoning` (o3/o4-mini)
 - Google: capturar respuesta real con `thoughts` (Gemini 2.5 Pro)
@@ -112,6 +124,7 @@ Bootstrap del proyecto con harness completo:
 - **Output**: 5 archivos JSON en `test/fixtures/`
 
 **0.4 — Validación de heurística agnóstica**
+
 - Listar todos los campos en fixtures (recursive key discovery)
 - Construir whitelist `REASONING_FIELDS` basada en evidencia
 - Validar detección en 4 fixtures positive
@@ -119,6 +132,7 @@ Bootstrap del proyecto con harness completo:
 - **Output**: `docs/ARCHITECTURE.md` §2 con tabla `campo → provider → fixture × detectado`
 
 **0.5 — Versionado de opencode**
+
 - `opencode --version` → baseline
 - Listar versiones ≥ 1.15
 - Para cada versión, documentar disponibilidad de hooks
@@ -172,25 +186,27 @@ Bootstrap del proyecto con harness completo:
 
 ## Risks & Mitigations
 
-| Riesgo | Mitigación |
-|---|---|
-| Plugin API cambió desde opencode 1.15 | FASE 0.1 + FASE 3.5 lo detecta; documentar versión mínima real |
-| Falsos positivos en detección agnóstica | Whitelist explícita + fixture de control negativo |
-| Render se ve mal en algunos themes | Usar ANSI escapes estándar |
-| Public npm publish falla | Verificar credenciales antes de FASE 4.5 |
-| GitHub repo过早 (WIP expuesto) | Primer push solo después de FASE 2 (MVP funcional) |
-| Bin/dev.sh rompe si opencode no está en PATH | Documentar requisito, fail con mensaje claro |
+| Riesgo                                       | Mitigación                                                     |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| Plugin API cambió desde opencode 1.15        | FASE 0.1 + FASE 3.5 lo detecta; documentar versión mínima real |
+| Falsos positivos en detección agnóstica      | Whitelist explícita + fixture de control negativo              |
+| Render se ve mal en algunos themes           | Usar ANSI escapes estándar                                     |
+| Public npm publish falla                     | Verificar credenciales antes de FASE 4.5                       |
+| GitHub repo过早 (WIP expuesto)               | Primer push solo después de FASE 2 (MVP funcional)             |
+| Bin/dev.sh rompe si opencode no está en PATH | Documentar requisito, fail con mensaje claro                   |
 
 ---
 
 ## Tracking
 
 Cada fase cierra con:
+
 - Commit dedicado
 - Actualización de `progress.md` en `.superpowers/sdd/<plan>/` (creado por orchestrator)
 - `mem_save` en Engram con `topic_key: think-separator-task-<n>`
 
 Plan completion protocol (del orchestrator):
+
 - Triage de parked findings (apply/dismiss/defer)
 - Rewrite de `progress.md` en formato resumido
 - `mem_save` con `topic_key: think-separator-plan-complete`

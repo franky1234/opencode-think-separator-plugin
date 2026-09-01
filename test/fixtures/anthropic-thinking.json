@@ -1,14 +1,17 @@
 {
-  "_meta": {
-    "provider": "anthropic",
-    "model": "claude-sonnet-4.5",
-    "synthetic": true,
-    "validation": "pending",
-    "source_doc": "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking"
-  },
-  "role": "assistant",
-  "content": [
-    { "type": "thinking", "thinking": "The user wants X. I'll reason through Y, then construct Z carefully." },
-    { "type": "text", "text": "Here is the answer." }
-  ]
+    "_meta": {
+        "provider": "anthropic",
+        "model": "claude-sonnet-4.5",
+        "synthetic": true,
+        "validation": "pending",
+        "source_doc": "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking"
+    },
+    "role": "assistant",
+    "content": [
+        {
+            "type": "thinking",
+            "thinking": "The user wants X. I'll reason through Y, then construct Z carefully."
+        },
+        {"type": "text", "text": "Here is the answer."}
+    ]
 }

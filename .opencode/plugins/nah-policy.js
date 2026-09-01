@@ -171,4 +171,7 @@ export const NahPolicyPlugin = async ({ directory, $, client }) => {
   }
 }
 
-export default NahPolicyPlugin
+export default {
+  id: "nah-policy",
+  server: NahPolicyPlugin,
+}

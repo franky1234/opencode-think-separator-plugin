@@ -40,6 +40,7 @@ This is a **required step before v1.0.0**. See [test/fixtures/README.md](test/fi
 ## Reporting issues
 
 Use GitHub Issues. Include:
+
 - opencode version (`opencode --version`)
 - Provider and model you were using
 - A minimal reproduction (the prompt + what you expected vs what you saw)

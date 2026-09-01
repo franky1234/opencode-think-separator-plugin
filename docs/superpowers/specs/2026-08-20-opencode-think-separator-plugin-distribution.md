@@ -42,6 +42,7 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 ### Task 1 — Working tree cleanup (restore v0.1.0 baseline)
 
 **Files touched:**
+
 - DELETE: `src/tui.jsx`
 - DELETE: `src/sidebar.js`
 - DELETE: `test/tui.test.js`
@@ -50,6 +51,7 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 - EDIT: `.gitignore` (append `q.json` so it cannot reappear)
 
 **Acceptance criteria:**
+
 - [ ] `git status` shows only the new/changed files from Tasks 2-7 (rename, `package.json` edits, `.npmignore`, `bin/install.sh`, README rewrite) plus the deleted items as a clean diff.
 - [ ] `ls src/` shows exactly: `config.js`, `detect-reasoning.js`, `index.js`, `render.js` (no `tui.jsx`, no `sidebar.js`).
 - [ ] `ls test/` shows exactly: `config.test.js`, `detect-reasoning.test.js`, `fixtures/`, `plugin.test.js`, `render.test.js` (no `tui.test.js`).
@@ -57,6 +59,7 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 - [ ] `q.json` is absent from the working tree AND from the next git commit.
 
 **Step-by-step:**
+
 1. `git restore bin/dev.sh` to discard the in-tree edits added since `v0.1.0`.
 2. `git rm --cached src/tui.jsx src/sidebar.js test/tui.test.js` (or `git rm -f` if needed).
 3. `rm -f q.json`.
@@ -64,10 +67,12 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 5. Verify: `git status --short` shows only the intended diffs; `npm test` exits 0 with 19 tests passing.
 
 **TDD:**
+
 - This task removes code, not adds. The acceptance check `npm test` must continue to pass (19/19) after the cleanup.
 - How to run: `npm test`.
 
 **Reviewer focus:**
+
 - **[BLOCKER] correctness:** Confirm `bin/dev.sh` matches the v0.1.0 version (no `node -e` block for tui.json).
 - **[BLOCKER] cleanliness:** `git status --short` must NOT show `q.json` or any of the deleted files.
 - **[SUGGESTION] gitignore hygiene:** Move `q.json` higher in `.gitignore` for visibility.
@@ -75,6 +80,7 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 ### Task 2 — Mechanical rename (`think-separator-plugin` → `opencode-think-separator-plugin`)
 
 **Files touched (every literal occurrence):**
+
 - `package.json:2` (`name`)
 - `package.json:40,43,45` (`repository.url`, `bugs.url`, `homepage`) — see §6 open question on GitHub repo URL
 - `README.md:1,12,13,22,29,65` (title, clone URL, install commands, plugin array entry, plugin options example)
@@ -88,12 +94,14 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 - `bin/harness-load.sh:2`
 
 **Files NOT touched (intentional):**
+
 - `docs/superpowers/plans/think-separator-0.1.0.md` — historical plan, keep as-is.
 - `test/fixtures/*.json` — no occurrences.
 - `test/*.test.js` — no occurrences (tests import by relative path).
 - `.opencode/agent/orchestrator.md`, `.opencode/agent/dev-think-separator.md` — references are to `topic_key: think-separator-task-<n>` for Engram memory keys. Leave untouched.
 
 **Acceptance criteria:**
+
 - [ ] `grep -rn 'think-separator-plugin' --include='*.{js,json,md,sh,yaml,yml}' --exclude-dir=node_modules --exclude-dir=.superpowers --exclude-dir=.opencode .` returns ONLY matches inside `docs/superpowers/plans/think-separator-0.1.0.md` (historical plan) and `.opencode/agent/*.md` (orchestrator internal memory keys). Zero other matches.
 - [ ] `package.json:2` reads `"name": "opencode-think-separator-plugin"`.
 - [ ] `src/index.js:98` reads `id: 'opencode-think-separator-plugin'`.
@@ -102,16 +110,19 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 - [ ] `npm test` still passes 19/19.
 
 **Step-by-step:**
+
 1. Run baseline grep before edits.
 2. Apply the literal substitution per §4 Task 2 files-touched list.
 3. Re-run grep; assert only whitelisted historical/internal matches remain.
 4. Run `npm test`; assert 19/19 pass.
 
 **TDD:**
+
 - No new tests required (rename is mechanical). Tests import by relative path, not package name.
 - The acceptance check IS the test: grep returns zero unexpected matches.
 
 **Reviewer focus:**
+
 - **[BLOCKER] completeness:** If any user-visible match is missed, downstream install instructions break.
 - **[BLOCKER] id-field consistency:** `src/index.js:98` `id` must equal `package.json:2` `name` exactly.
 - **[SUGGESTION] docs drift:** illustrative examples should track real names.
@@ -119,9 +130,11 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 ### Task 3 — `package.json` updates for npm publish
 
 **Files touched:**
+
 - `package.json` (the whole file: ~46 lines)
 
 **Acceptance criteria:**
+
 - [ ] `name` = `"opencode-think-separator-plugin"`.
 - [ ] `version` = `"0.1.0"` (UNCHANGED).
 - [ ] `main` = `"src/index.js"`.
@@ -136,15 +149,18 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 - [ ] `repository.url`, `bugs.url`, `homepage` updated only if GitHub repo is renamed (see §6).
 
 **Step-by-step:**
+
 1. Open `package.json` and apply field-level edits.
 2. Validate JSON: `node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'))"`.
 3. Validate `prepublishOnly`: `npm run prepublishOnly` must run `node --check src/index.js && npm test` and exit 0.
 4. Validate bin entry: `node -e "const p = require('./package.json'); console.log(p.bin)"`.
 
 **TDD:**
+
 - No new tests; this is metadata. `npm run prepublishOnly` IS the executable check.
 
 **Reviewer focus:**
+
 - **[BLOCKER] no version bump.**
 - **[BLOCKER] prepublishOnly syntax:** must be a single shell string.
 - **[BLOCKER] files whitelist:** if `bin/install.sh` is missing from `files`, the `bin` symlink is broken.
@@ -153,9 +169,11 @@ Repackage the working `think-separator-plugin` (v0.1.0, server-side only, 19/19 
 ### Task 4 — `.npmignore`
 
 **Files touched:**
+
 - CREATE: `.npmignore` (does not exist today)
 
 **Acceptance criteria:**
+
 - [ ] File exists at repo root.
 - [ ] Tarball inspection (`npm pack --dry-run`) shows ONLY `[package.json, README.md, LICENSE, src/, bin/install.sh]`.
 
@@ -195,9 +213,11 @@ node_modules/
 ```
 
 **TDD:**
+
 - Not a code change. Verification is via Task 7's `npm publish --dry-run` tarball inspection.
 
 **Reviewer focus:**
+
 - **[BLOCKER] over-exclusion:** if `src/` ends up in `.npmignore`, the package ships empty.
 - **[BLOCKER] under-exclusion:** if dev folders ship, the package leaks internals.
 - **[SUGGESTION] defensive entries.**
@@ -205,18 +225,20 @@ node_modules/
 ### Task 5 — `bin/install.sh` (one-shot installer, server-only)
 
 **Files touched:**
+
 - CREATE: `bin/install.sh`
 
 **Acceptance criteria:**
+
 - [ ] File exists at `bin/install.sh`.
 - [ ] `chmod +x bin/install.sh` succeeds.
 - [ ] `bash -n bin/install.sh` exits 0 (syntax check).
 - [ ] Running `bash bin/install.sh`:
-  - Creates `opencode.json` if absent.
-  - Adds `"opencode-think-separator-plugin"` to the existing `plugin` array (or creates array if missing).
-  - Does NOT touch `tui.json` at any path.
-  - Backs up `opencode.json` to `opencode.json.bak.<ISO-timestamp>` before editing.
-  - Prints next-step message: "restart opencode to load the plugin".
+    - Creates `opencode.json` if absent.
+    - Adds `"opencode-think-separator-plugin"` to the existing `plugin` array (or creates array if missing).
+    - Does NOT touch `tui.json` at any path.
+    - Backs up `opencode.json` to `opencode.json.bak.<ISO-timestamp>` before editing.
+    - Prints next-step message: "restart opencode to load the plugin".
 - [ ] Re-running is idempotent (plugin name appears exactly once).
 
 **Step-by-step:**
@@ -276,9 +298,11 @@ echo "next: restart opencode to load the plugin"
 Then `chmod +x bin/install.sh` and `bash -n bin/install.sh`.
 
 **TDD:**
+
 - The script is bash; no JS tests. The acceptance criteria ARE the tests.
 
 **Reviewer focus:**
+
 - **[BLOCKER] no tui.json mutation.**
 - **[BLOCKER] idempotency.**
 - **[BLOCKER] backup.**
@@ -287,9 +311,11 @@ Then `chmod +x bin/install.sh` and `bash -n bin/install.sh`.
 ### Task 6 — Rewrite `README.md` install section
 
 **Files touched:**
+
 - EDIT: `README.md` (rewrite install section + remove obsolete TUI limitation)
 
 **Acceptance criteria:**
+
 - [ ] `README.md:1` reads `# opencode-think-separator-plugin`.
 - [ ] "Install" section leads with the `opencode.json` path; `bin/install.sh` listed as alternative.
 - [ ] "From source (dev path)" preserved with renamed URLs.
@@ -301,7 +327,7 @@ Then `chmod +x bin/install.sh` and `bash -n bin/install.sh`.
 
 Rewrite title and install section per the example below:
 
-```markdown
+````markdown
 # opencode-think-separator-plugin
 
 An opencode plugin that visually separates the model's reasoning block from its final response, server-side.
@@ -316,9 +342,10 @@ Add the plugin to your existing config:
 
 ```json
 {
-  "plugin": ["opencode-think-separator-plugin"]
+    "plugin": ["opencode-think-separator-plugin"]
 }
 ```
+````
 
 opencode auto-installs npm packages on startup ([docs](https://opencode.ai/docs/plugins/#how-plugins-are-installed)). No `npm install -g` step required — the package is fetched into `~/.cache/opencode/node_modules/` at first run.
 
@@ -339,6 +366,7 @@ cd think-separator-plugin
 ```
 
 `bin/dev.sh` symlinks the source into `~/.config/opencode/plugins/` and starts opencode.
+
 ```
 
 **TDD:**
@@ -434,3 +462,4 @@ Default assumption for the spec: **(b) — keep the repo name, only `package.jso
 | Tarball clean | Task 7 | `npm publish --dry-run` + smoke import |
 
 Final gate: FASE 4 (code-reviewer APPROVE + qa PASS) before any commit of the renamed + npm-ready tree to main.
+```

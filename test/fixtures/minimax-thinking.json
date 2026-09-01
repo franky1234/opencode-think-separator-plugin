@@ -1,14 +1,14 @@
 {
-  "_meta": {
-    "provider": "minimax",
-    "model": "MiniMax-M3",
-    "synthetic": true,
-    "validation": "pending",
-    "source_doc": "https://platform.MiniMax.io/docs/thinking"
-  },
-  "role": "assistant",
-  "content": [
-    { "type": "thinking", "thinking": "Internal reasoning trace." },
-    { "type": "text", "text": "Visible response." }
-  ]
+    "_meta": {
+        "provider": "minimax",
+        "model": "MiniMax-M3",
+        "synthetic": true,
+        "validation": "pending",
+        "source_doc": "https://platform.MiniMax.io/docs/thinking"
+    },
+    "role": "assistant",
+    "content": [
+        {"type": "thinking", "thinking": "Internal reasoning trace."},
+        {"type": "text", "text": "Visible response."}
+    ]
 }

@@ -22,6 +22,11 @@ q.json
 package-lock.json
 *.lock
 
+# Config files
+.prettierrc
+.prettierignore
+prettier.config.js
+
 # Build artifacts
 dist/
 node_modules/

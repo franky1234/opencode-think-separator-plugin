@@ -13,16 +13,16 @@ The plugin ships as two exports in `src/index.js` (server-side) and `src/tui.js`
 
 ```js
 export const ThinkSeparator = async (input, options) => {
-  const config = mergeConfig(options || {});
-  return {
-    'experimental.chat.messages.transform': async (_input, output) => {
-      for (const msg of output.messages) {
-        if (msg.info.role !== 'assistant') continue;
-        transformMessage(msg, config.label);
-      }
+    const config = mergeConfig(options || {})
+    return {
+        "experimental.chat.messages.transform": async (_input, output) => {
+            for (const msg of output.messages) {
+                if (msg.info.role !== "assistant") continue
+                transformMessage(msg, config.label)
+            }
+        }
     }
-  };
-};
+}
 ```
 
 The single hook `experimental.chat.messages.transform` rewrites every assistant message before persistence. `transformMessage` (private) handles two cases (see §2).
@@ -65,47 +65,61 @@ Some providers do not get normalized to `type: "reasoning"` parts by opencode's 
 
 The plugin reconstructs a synthetic message shape from the parts and runs `detectReasoning()` from `src/detect-reasoning.js`. If it matches, the plugin prefixes the text with the rendered reasoning block.
 
+### Case 3: Raw text XML-like reasoning tags (MiniMax, DeepSeek-R1, Qwen, Ollama)
+
+When providers emit reasoning as raw text embedded within XML-like tags (such as `<think>...</think>`, `<thought>...</thought>`, `<antThinking>`, etc.), the plugin's `extractReasoningFromText` function isolates the reasoning content, cleans the text part, formats the reasoning via `renderReasoning()`, and reconstructs the message parts cleanly.
+
 ### Detection whitelist (`src/detect-reasoning.js`)
 
 ```js
 export const REASONING_FIELDS = Object.freeze([
-  'thinking',
-  'reasoning',
-  'reasoning_content',
-  'reasoning_text',
-  'redacted_thinking',
-  'thoughts',
-  'cot',
-  'chain_of_thought',
-  'internal_monologue',
-  'reflection'
-]);
+    "thinking",
+    "reasoning",
+    "reasoning_content",
+    "reasoning_text",
+    "redacted_thinking",
+    "thoughts",
+    "cot",
+    "chain_of_thought",
+    "internal_monologue",
+    "reflection"
+])
+
+export const REASONING_TAG_NAMES = Object.freeze([
+    "think",
+    "thought",
+    "thoughts",
+    "reasoning",
+    "antThinking",
+    "thought_process",
+    "chain_of_thought"
+])
 ```
 
-The whitelist is exhaustive. Adding a new provider means adding its field name to this list, not editing detection logic.
+The whitelist is exhaustive. Adding a new provider means adding its field or tag name to these lists.
 
 ### Field-to-provider coverage
 
-| Field | Provider(s) | Fixture | Detected |
-|---|---|---|---|
-| thinking (block) | Anthropic, MiniMax | anthropic-thinking.json | yes |
-| reasoning_content | OpenAI | openai-reasoning.json | yes |
-| thoughts | Google | google-thoughts.json | yes |
-| thinking (block) | MiniMax | minimax-thinking.json | yes |
-| (none) | control | no-reasoning-control.json | null |
+| Field / Tag        | Provider(s)                        | Fixture / Format           | Detected |
+| ------------------ | ---------------------------------- | -------------------------- | -------- |
+| thinking (block)   | Anthropic, MiniMax                 | anthropic-thinking.json    | yes      |
+| reasoning_content  | OpenAI, DeepSeek API               | openai-reasoning.json      | yes      |
+| thoughts           | Google                             | google-thoughts.json       | yes      |
+| <think>...</think> | MiniMax, DeepSeek-R1, Qwen, Ollama | raw text tag in text parts | yes      |
+| (none)             | control                            | no-reasoning-control.json  | null     |
 
 All fixtures are `synthetic-pending-validation`. See [test/fixtures/README.md](../test/fixtures/README.md).
 
 ## 3. Render pipeline
 
-ANSI conventions (locked):
+Markdown-based rendering for seamless OpenCode TUI integration:
 
-- Header: `BOLD + UNDERLINE + "── <label> ──" + RESET`.
-- Reasoning body: `DIM` ... `RESET`, 2-space indent per line.
-- Trailing blank line (`\n\n`) separates reasoning from response.
-- Response body: no dim, no header — pass-through with 2-space indent per line.
+- **Header**: `> ### ── <label> ──` (rendered via Markdown heading inside blockquote with accent/header theme styling).
+- **Reasoning body**: `> *line*` (italicized inside blockquote, visually subdued and indented).
+- **Separator**: Trailing blank line (`\n\n`) cleanly separating reasoning from the response body.
+- **Response body**: Normal weight pass-through text.
 
-### Sequence
+### In-Memory Transformation Sequence
 
 ```
 message arrives
@@ -113,45 +127,40 @@ message arrives
    ▼
 experimental.chat.messages.transform fires
    │
-   ▼
-Case 1? ──yes──► collect reasoning parts ──► renderReasoning(text, label)
-   │                                       │
-   │                                       ▼
-   │                                  prepend to text parts
-   │                                       │
-   │                                       ▼
-   │                                  remove original reasoning parts
+   ├──► Case 1: opencode-native or provider-specific reasoning parts (type: "reasoning" | "thinking")
+   │       └──► collect reasoning text & remove reasoning part
    │
-   ├──no──► Case 2 fallback via detectReasoning()
+   ├──► Case 2: XML reasoning tags inside text parts (<think>, <thought>, <antThinking>, <reasoning>)
+   │       └──► extractReasoningFromText() parses closed & unclosed tags
+   │       └──► clean text in-place & collect extracted reasoning blocks
+   │
+   ├──► Case 3: Defense-in-depth top-level detection (detectReasoning fallback)
    │
    ▼
-transformed msg persisted
+reasoning rendered via renderReasoning(reasoningText, label)
    │
    ▼
-rendered by TUI with visible separator
-   │
-   ▼
-TUI-side slot reads messages, shows count indicator
+prepended to first text part in-memory (pure in-memory mutation on msg.parts)
 ```
 
 ### Functions (`src/render.js`)
 
-- `renderReasoning(reasoningText, label) -> string` — header + dim body + trailing blank line.
-- `renderResponse(responseText) -> string` — 2-space indented, no header, no dim.
-- `compose(detection, responseText, label) -> string` — combines the two for callers that want the full block.
+- `renderReasoning(reasoningText, label) -> string` — creates `> ### ── <label> ──` header + `> *...*` blockquote body with trailing separator.
+- `renderResponse(responseText) -> string` — 2-space indented response text.
+- `compose(detection, responseText, label) -> string` — combines the reasoning block and response for unified formatting.
 
 ## 4. Config API
 
 ```js
-import { defaultConfig, mergeConfig } from 'opencode-think-separator-plugin';
+import {defaultConfig, mergeConfig} from "opencode-think-separator-plugin"
 
-mergeConfig({ label: 'Thinking' });
+mergeConfig({label: "Thinking"})
 // -> { label: 'Thinking' }
 
-mergeConfig({});
+mergeConfig({})
 // -> { label: 'Reasoning' } (= defaultConfig)
 
-mergeConfig({ label: 'X', futureOption: 42 });
+mergeConfig({label: "X", futureOption: 42})
 // -> { label: 'X' }  (futureOption ignored — forward-compat)
 ```
 

@@ -12,7 +12,7 @@ Add the plugin to your existing config:
 
 ```json
 {
-  "plugin": ["opencode-think-separator-plugin"]
+    "plugin": ["opencode-think-separator-plugin"]
 }
 ```
 
@@ -38,18 +38,23 @@ cd think-separator-plugin
 
 ## How it works
 
-When the LLM produces a response that includes reasoning (chain-of-thought, extended thinking, internal monologue), opencode emits it as a separate `type: "reasoning"` part. This plugin intercepts the message stream and rewrites each reasoning part into a text part prefixed with a visual separator:
+When the LLM produces a response that includes reasoning (chain-of-thought, extended thinking, internal monologue), opencode emits it as a separate `type: "reasoning"` part or inside embedded tags like `<think>...</think>`. This plugin intercepts the message stream and rewrites each reasoning section into a formatted block prefixed with a visual separator:
 
+```markdown
+> ### ── Reasoning ──
+>
+> _The model thinks step by step here..._
+
+This is the final, visible response.
 ```
-── Reasoning ──
-  The model thinks step by step here...
 
-  This is the final, visible response.
-```
+Reasoning appears inside an italicized blockquote with a styled header, followed by a blank line before the final response.
 
-Reasoning appears in dim text with a bold/underlined header. The final response is in normal weight below, separated by a blank line.
+The detection layer covers:
 
-The detection layer also covers providers that emit reasoning in non-standard shapes (Anthropic/MiniMax `content[]` blocks with `type: "thinking"`, OpenAI top-level `reasoning_content`, Google top-level `thoughts`) as defense-in-depth.
+- **Native reasoning/thinking parts**: Anthropic, MiniMax, OpenAI, Google.
+- **Embedded XML reasoning tags in text**: `<think>`, `<thought>`, `<antThinking>`, `<reasoning>`, `<thought_process>`, `<chain_of_thought>` (e.g. MiniMax, DeepSeek-R1, Qwen, Ollama).
+- **Non-standard top-level fields** (`reasoning_content`, `thoughts`) as defense-in-depth.
 
 For full architecture details see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
@@ -59,7 +64,7 @@ Default config:
 
 ```json
 {
-  "label": "Reasoning"
+    "label": "Reasoning"
 }
 ```
 
@@ -67,9 +72,7 @@ Override the header label by passing options to the plugin in `opencode.json`:
 
 ```json
 {
-  "plugin": [
-    ["opencode-think-separator-plugin", { "label": "Thinking" }]
-  ]
+    "plugin": [["opencode-think-separator-plugin", {"label": "Thinking"}]]
 }
 ```
 
@@ -77,10 +80,10 @@ Unknown keys in the options are silently ignored (forward-compat).
 
 ## Compatibility
 
-| opencode version | Status |
-|---|---|
-| 1.18.18 | ✓ verified |
-| 1.15 – 1.17 | untested, expected to work |
+| opencode version | Status                     |
+| ---------------- | -------------------------- |
+| 1.18.18          | ✓ verified                 |
+| 1.15 – 1.17      | untested, expected to work |
 
 See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the full matrix and expansion plan.
 

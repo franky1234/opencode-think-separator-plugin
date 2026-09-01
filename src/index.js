@@ -23,78 +23,88 @@
  * here for testability) for a second plugin function.
  */
 
-import { detectReasoning } from './detect-reasoning.js';
-import { renderReasoning } from './render.js';
-import { mergeConfig } from './config.js';
+import {detectReasoning, extractReasoningFromText} from "./detect-reasoning.js"
+import {renderReasoning} from "./render.js"
+import {mergeConfig} from "./config.js"
 
 export const ThinkSeparator = async (input, options) => {
-  const config = mergeConfig(options || {});
-  return {
-    'experimental.chat.messages.transform': async (_hookInput, output) => {
-      for (const msg of output.messages) {
-        if (msg.info.role !== 'assistant') continue;
-        transformMessage(msg, config.label);
-      }
-    },
-  };
-};
-
-export function transformMessage(msg, label) {
-  const parts = msg.parts;
-
-  // Case 1: opencode-native `type: "reasoning"` parts (most providers).
-  // Convert each into a text part with header + dim body, drop the original.
-  const reasoningTexts = [];
-  const remaining = [];
-  for (const part of parts) {
-    if (part && part.type === 'reasoning' && typeof part.text === 'string' && part.text.length > 0) {
-      reasoningTexts.push(part.text);
-    } else {
-      remaining.push(part);
+    const config = mergeConfig(options || {})
+    return {
+        "experimental.chat.messages.transform": async (_hookInput, output) => {
+            if (!output || !Array.isArray(output.messages)) return
+            for (const msg of output.messages) {
+                if (msg.info && msg.info.role !== "assistant") continue
+                transformMessage(msg, config.label)
+            }
+        }
     }
-  }
-
-  if (reasoningTexts.length > 0) {
-    const reasoningBlock = reasoningTexts
-      .map((t) => renderReasoning(t, label))
-      .join('\n');
-    const newTextPart = {
-      ...remaining[0],
-      type: 'text',
-      text: reasoningBlock + extractTextFromParts(remaining),
-    };
-    msg.parts = [newTextPart, ...remaining.slice(1)];
-    return;
-  }
-
-  // Case 2: provider-native reasoning shape (defense-in-depth).
-  // Reconstruct a synthetic message shape and pass to detectReasoning.
-  const synthetic = {
-    content: parts
-      .filter((p) => p && (p.type === 'text' || p.type === 'thinking'))
-      .map((p) => ({
-        type: p.type === 'thinking' ? 'thinking' : 'text',
-        [p.type === 'thinking' ? 'thinking' : 'text']: p.text,
-      })),
-  };
-  const detection = detectReasoning(synthetic);
-  if (!detection) return;
-  const reasoningBlock = renderReasoning(detection.reasoning, label);
-  const existingText = extractTextFromParts(parts);
-  msg.parts = [
-    { ...parts[0], type: 'text', text: reasoningBlock + existingText },
-    ...parts.slice(1),
-  ];
 }
 
-function extractTextFromParts(parts) {
-  return parts
-    .filter((p) => p && p.type === 'text' && typeof p.text === 'string')
-    .map((p) => p.text)
-    .join('\n');
+export function transformMessage(msg, label) {
+    if (!msg || !Array.isArray(msg.parts)) return
+
+    const reasoningTexts = []
+    const cleanParts = []
+
+    for (const part of msg.parts) {
+        if (!part || typeof part !== "object") continue
+
+        // Case 1: opencode-native or provider-specific reasoning parts
+        if (
+            (part.type === "reasoning" || part.type === "thinking") &&
+            typeof part.text === "string" &&
+            part.text.length > 0
+        ) {
+            reasoningTexts.push(part.text)
+            continue
+        }
+
+        // Case 2: text part that may contain XML reasoning tags (<think>...</think>, etc.)
+        if (part.type === "text" && typeof part.text === "string") {
+            const extracted = extractReasoningFromText(part.text)
+            if (extracted.reasoningTexts.length > 0) {
+                reasoningTexts.push(...extracted.reasoningTexts)
+            }
+            part.text = extracted.cleanText
+            cleanParts.push(part)
+            continue
+        }
+
+        // Case 3: Other parts (tool_use, image, tool_result, etc.) are preserved untouched
+        cleanParts.push(part)
+    }
+
+    // If no reasoning was found in parts or text tags, try top-level object fields (defense-in-depth)
+    if (reasoningTexts.length === 0) {
+        const synthetic = {
+            content: cleanParts
+                .filter((p) => p && p.type === "text")
+                .map((p) => ({type: "text", text: p.text}))
+        }
+        const detection = detectReasoning(synthetic) || detectReasoning(msg)
+        if (detection && detection.reasoning) {
+            reasoningTexts.push(detection.reasoning)
+        }
+    }
+
+    // If still no reasoning, leave message as is
+    if (reasoningTexts.length === 0) {
+        return
+    }
+
+    const reasoningBlock = reasoningTexts.map((t) => renderReasoning(t, label)).join("\n")
+
+    // Prepend reasoning block to the first text part, or insert a new text part if none exist
+    const firstTextIndex = cleanParts.findIndex((p) => p && p.type === "text")
+    if (firstTextIndex !== -1) {
+        cleanParts[firstTextIndex].text = reasoningBlock + cleanParts[firstTextIndex].text
+        msg.parts = cleanParts
+    } else {
+        msg.parts = [{type: "text", text: reasoningBlock}, ...cleanParts]
+    }
 }
 
 export default {
-  id: 'opencode-think-separator-plugin',
-  server: ThinkSeparator,
-};
+    id: "opencode-think-separator-plugin",
+    server: ThinkSeparator
+}
