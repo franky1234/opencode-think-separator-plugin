@@ -41,21 +41,21 @@
 
 ---
 
-## Pivote arquitectónico (descubierto durante Task 0)
+## Architectural Pivot (discovered during Task 0)
 
-La versión inicial de este plan asumía que existía un hook `onMessageRender` que permitía transformar el render del TUI en vivo. La investigación de Task 0 contra el código fuente de `anomalyco/opencode` (branch `dev`, paquete `packages/plugin/src/`) demostró que ese hook **no existe** en opencode 1.18.18.
+The initial version of this plan assumed an `onMessageRender` hook existed to transform the TUI render in real time. Task 0 investigation into `anomalyco/opencode` source code (`dev` branch, `packages/plugin/src/`) proved this hook **does not exist** in opencode 1.18.18.
 
-**Lo que SÍ existe** y permite el comportamiento deseado:
+**What DOES exist** and achieves the intended behavior:
 
-1. `experimental.chat.messages.transform` (server-side) — recibe todos los mensajes antes de que se persistan y permite mutar sus partes. Aquí reescribimos cada parte `type: "reasoning"` como un text part con header visual.
-2. `TuiPlugin` API + `slots.register` (TUI-side) — permite inyectar componentes JSX en slots de la UI para indicadores.
-3. `experimental.text.complete` (server-side) — alternativa para prefijar texto en partes individuales (no usado en MVP, queda como `DEFER`).
+1. `experimental.chat.messages.transform` (server-side) — receives all messages before persistence and allows mutating their parts. We rewrite each `type: "reasoning"` part or extracted XML tag as a formatted text part with visual header.
+2. `TuiPlugin` API + `slots.register` (TUI-side) — allows injecting JSX components into UI slots for status indicators.
+3. `experimental.text.complete` (server-side) — alternative for prefixing text on individual parts (deferred).
 
-**Implicaciones**:
+**Key Takeaways**:
 
-- El reasoning se transforma **al momento de persistirse**, no al renderizarse en vivo. Esto significa que después de cargar el plugin, los mensajes anteriores NO son re-procesados (es un trade-off aceptable para MVP).
-- El render visual es texto plano (no hay colapso interactivo) — esto matchea el non-goal "Render colapsable interactivo" del spec original.
-- El plugin funciona sin upstream patches. No requiere esperar features futuras.
+- Reasoning is transformed **upon message persistence**, not during initial raw stream rendering. Previous historical messages prior to plugin loading are not re-processed.
+- Visual rendering is pure Markdown blockquote (matching the non-goal "No interactive collapse" in the original spec).
+- The plugin operates with zero upstream patches and zero runtime dependencies.
 
 ---
 

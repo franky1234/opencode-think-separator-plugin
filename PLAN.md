@@ -2,30 +2,30 @@
 
 Opencode TUI plugin that visually separates the model's reasoning block (`<think>`, `reasoning`, `thoughts`, etc.) from its final response. Provider-agnostic (Anthropic, OpenAI, Google, MiniMax) and opencode-version-agnostic (≥ 1.15).
 
-**Repo**: https://github.com/franky1234/think-separator-plugin
-**Path**: `/home/franklin/Desktop/REPO/klassapp/opencode-think-separator-plugin/`
-**Version**: `0.1.0` (MVP)
+**Repo**: https://github.com/franky1234/opencode-think-separator-plugin
+**Path**: `/home/franklin/Desktop/REPO/klassapp/think-separator-plugin/`
+**Version**: `0.2.0`
 **License**: MIT
 
 ---
 
 ## Scope & Goals
 
-1. Plugin standalone para opencode TUI que detecta bloques de razonamiento y los renderiza con header "Reasoning" + separador.
-2. Agnóstico a provider — detección por field-name discovery, no por nombres hardcodeados.
-3. Agnóstico a versión de opencode ≥ 1.15 — usar solo plugin API documentada como estable.
-4. Distribución pública vía GitHub + npm.
-5. Harness propio del proyecto (orchestrator / dev / qa) para coordinar desarrollo.
+1. Standalone plugin for opencode TUI that detects reasoning blocks and renders them with a "Reasoning" header + separator.
+2. Provider-agnostic — detection via field-name discovery and XML tag parsing, not hardcoded provider checks.
+3. Opencode-version-agnostic ≥ 1.15 — using only documented and stable plugin APIs.
+4. Public distribution via GitHub + npm.
+5. Project-specific harness (orchestrator / dev / qa) to coordinate development.
 
 ---
 
-## Non-Goals (out of scope for v0.1.0)
+## Non-Goals (out of scope for v0.2.0)
 
-- Render colapsable interactivo (header siempre visible en MVP)
-- Configuración visual runtime por el usuario (label fijo "Reasoning" en MVP, configurable a futuro via plugin config)
-- Soporte de providers no estándar (solo los 4 documentados)
-- Compatibilidad con versiones opencode < 1.15
-- Integración con temas específicos de opencode (render agnóstico al theme)
+- Interactive collapsible rendering (header always visible in MVP)
+- Runtime visual user configuration (fixed label "Reasoning" default, customizable via plugin config)
+- Support for non-standard undocumented raw socket protocols
+- Compatibility with opencode versions < 1.15
+- Theme-specific coupling (render remains theme-agnostic via Markdown)
 
 ---
 
@@ -33,23 +33,13 @@ Opencode TUI plugin that visually separates the model's reasoning block (`<think
 
 ```
 src/
-├── index.js              # Entry point, registra hooks
-├── detect-reasoning.js   # Heurística agnóstica (whitelist de campos)
-├── render.js             # Render con header + separador
-└── config.js             # Defaults (label, futuras opciones)
-
-test/
-├── detect-reasoning.test.js
-├── render.test.js
-└── fixtures/             # JSON reales de 4 providers
-    ├── anthropic-thinking.json
-    ├── openai-reasoning.json
-    ├── google-thoughts.json
-    ├── minimax-thinking.json
-    └── no-reasoning-control.json
+├── index.js              # Entry point, registers hooks and message transformer pipeline
+├── detect-reasoning.js   # Strategy-based detector and 3-phase XML reasoning parser
+├── render.js             # Markdown formatter (header + blockquote + separator)
+└── config.js             # Configuration defaults and safe merger
 ```
 
-### Detection (agnostic heuristic)
+### Detection (Agnostic Heuristic & XML Tag Parsing)
 
 ```js
 const REASONING_FIELDS = [
@@ -68,157 +58,121 @@ const REASONING_FIELDS = [
 
 Strategy:
 
-1. Scan `message.content[]` blocks (Anthropic/MiniMax style)
-2. Scan top-level `message.*` fields (OpenAI/Google style)
-3. Return first match with `reasoning`, `source` field name, and `kind`
-4. Return `null` if no match (control negative case)
+1. Scan `message.parts` for native reasoning types (`reasoning`, `thinking`).
+2. Scan text parts for embedded XML reasoning tags (`<think>`, `<thought>`, `<antThinking>`, `<reasoning>`, etc.).
+3. Scan top-level `message.*` fields (OpenAI/Google style) as defense-in-depth.
+4. Return first match with `reasoning`, `source` field name, and `kind`.
+5. Return `null` if no match (control negative case).
 
 ### Render
 
-- Header fijo: `── Reasoning ──` con estilo monoespaciado
-- Contenido del reasoning indentado y con color dim respecto al response
-- Separador visual entre bloque reasoning y bloque response
-- Agnóstico al theme (usa ANSI escapes que respetan paleta del terminal)
+- Markdown Header: `> ### ── Reasoning ──`
+- Blockquote body: `> *line*` (italicized and indented inside blockquote)
+- Visual trailing separator: double newline before final response
+- Theme-agnostic: relies on native OpenCode Markdown theme engine
 
 ---
 
 ## Phases
 
-### FASE H — Harness ✅ COMPLETED (commit `ab115b2`)
+### PHASE H — Harness ✅ COMPLETED (commit `ab115b2`)
 
-Bootstrap del proyecto con harness completo:
+Project bootstrap with complete agentic harness:
 
 - AGENTS.md, .harness/{domains,models}.yaml, generate-agents.sh, add-skills.sh
-- .opencode/agent/*.md (orchestrator hand-written + 4 generados)
+- .opencode/agent/*.md (orchestrator hand-written + 4 generated)
 - .opencode/nah/policy.yaml + .opencode/plugins/nah-policy.js (26 tests pass)
 - opencode.json (superpowers plugin + engram MCP)
 - bin/harness-load.sh (dev launcher)
 - package.json v0.1.0
 - Smoke test: add-skills ✓, nah-policy tests 26/26 ✓, opencode 1.18.18 detected ✓
 
-### FASE 0 — Investigación profunda (NEXT)
+### PHASE 0 — Deep Research & Discovery ✅ COMPLETED
 
-**0.1 — Plugin API de opencode**
+**0.1 — Opencode Plugin API**
+- Analyzed `packages/plugin/src/` and `~/.config/opencode/plugins/`
+- Identified `experimental.chat.messages.transform` as the primary server hook
+- Documented in `docs/PLUGIN_API.md`
 
-- `read` https://opencode.ai/docs/plugins
-- `read` ~/.config/opencode/plugins/engram.ts (ejemplo real)
-- `grep` en ~/.cache/opencode/packages/opencode-ai/ para listar exports/hooks
-- Determinar API mínima común entre opencode ≥ 1.15
-- Documentar: tabla hooks × versiones opencode
-- **Output**: `docs/PLUGIN_API.md`
+**0.2 — Localization of `<think>` serialization**
+- Verified streaming behavior and message transform lifecycle
+- Documented in `docs/ARCHITECTURE.md`
 
-**0.2 — Localización de serialización del `<think>`**
+**0.3 — Provider Fixtures Collection**
+- Anthropic, OpenAI, Google, MiniMax synthetic fixtures
+- Control negative fixture
+- Output: 5 JSON files in `test/fixtures/`
 
-- `grep -rn "<think>" ~/.cache/opencode/packages/opencode-ai/ --include="*.ts" --include="*.js"`
-- `read` archivo identificado
-- Determinar si el plugin puede interceptar antes o solo después de la serialización
-- **Output**: nota técnica en `docs/PLUGIN_API.md` §2 (archivo:línea)
+**0.4 — Agnostic Heuristic Validation**
+- Built `REASONING_FIELDS` and `REASONING_TAG_NAMES` whitelists
+- Validated across all 5 test fixtures
 
-**0.3 — Recolección de fixtures de providers**
+**0.5 — Version Compatibility**
+- Matrix documented in `docs/COMPATIBILITY.md`
 
-- Anthropic: capturar respuesta real con `type:"thinking"` (Claude Sonnet 4.5)
-- OpenAI: capturar respuesta real con `reasoning` (o3/o4-mini)
-- Google: capturar respuesta real con `thoughts` (Gemini 2.5 Pro)
-- MiniMax: capturar respuesta real con `type:"thinking"` (M3)
-- Control: respuesta sin razonamiento (cualquier provider)
-- **Output**: 5 archivos JSON en `test/fixtures/`
+### PHASE 1 — Contract & Design Architecture ✅ COMPLETED
 
-**0.4 — Validación de heurística agnóstica**
+- **1.1** Plugin interface and hook signatures → `docs/ARCHITECTURE.md` §1
+- **1.2** Agnostic heuristic documentation → `docs/ARCHITECTURE.md` §2
+- **1.3** Theme-agnostic Markdown render pipeline → `docs/ARCHITECTURE.md` §3
+- **1.4** Configuration API (`label`, future options) → `docs/ARCHITECTURE.md` §4
 
-- Listar todos los campos en fixtures (recursive key discovery)
-- Construir whitelist `REASONING_FIELDS` basada en evidencia
-- Validar detección en 4 fixtures positive
-- Validar no-detección en fixture control negativo
-- **Output**: `docs/ARCHITECTURE.md` §2 con tabla `campo → provider → fixture × detectado`
+### PHASE 2 — Implementation ✅ COMPLETED
 
-**0.5 — Versionado de opencode**
+- **2.1** `src/detect-reasoning.js` with Strategy Pattern + XML parser
+- **2.2** `src/render.js` with Formatter Pattern (Markdown blockquote)
+- **2.3** `src/config.js` with frozen defaults (`label: "Reasoning"`)
+- **2.4** `src/index.js` with Pipeline Transformer Pattern
+- **2.5** `bin/dev.sh` linking plugin and starting opencode
+- **2.6** Unit test suite (27 passing tests)
 
-- `opencode --version` → baseline
-- Listar versiones ≥ 1.15
-- Para cada versión, documentar disponibilidad de hooks
-- **Output**: matriz compatibilidad en `docs/COMPATIBILITY.md`
+### PHASE 3 — Cross-Provider Validation & Hardening ✅ COMPLETED
 
-### FASE 1 — Diseño del contrato (Architect)
+- **3.1** Full test suite passing (4 providers + control + XML tag fixtures)
+- **3.2** Plugin loads cleanly in OpenCode without errors
+- **3.3** Pure in-memory transformation (zero SQLite / DB contamination)
+- **3.4** Updated `docs/COMPATIBILITY.md` and `docs/ARCHITECTURE.md`
 
-- **1.1** Diseñar interfaz del plugin (`name`, `hooks`, signatura) → `docs/ARCHITECTURE.md` §1
-- **1.2** Documentar heurística agnóstica validada → `docs/ARCHITECTURE.md` §2
-- **1.3** Diseñar render agnóstico al theme → `docs/ARCHITECTURE.md` §3
-- **1.4** Definir API de config (`label`, futuras opciones) → `docs/ARCHITECTURE.md` §4
+### PHASE 4 — Public Distribution Preparation ✅ COMPLETED
 
-### FASE 2 — Implementación (Dev → QA loop)
-
-- **2.1** `src/detect-reasoning.js` + tests (cubrir las 5 fixtures)
-- **2.2** `src/render.js` + tests (header + separador, agnóstico al theme)
-- **2.3** `src/config.js` con defaults (`label: "Reasoning"`)
-- **2.4** `src/index.js` con hooks (basado en API validada en FASE 0)
-- **2.5** `bin/dev.sh` linkea plugin y arranca opencode
-- **2.6** README inicial
-
-### FASE 3 — Validación cross-provider y cross-versión (QA)
-
-- **3.1** Suite completa pasa (4 providers + control negativo)
-- **3.2** Plugin se carga en opencode sin errores
-- **3.3** `/thinking` toggle sigue funcionando con plugin cargado
-- **3.4** Export (`ctrl+x x`) mantiene separador
-- **3.5** Probar contra opencode ≥ 1.15 (al menos 2 versiones)
-- **3.6** Llenar `docs/COMPATIBILITY.md`
-
-### FASE 4 — Deploy público (Dev + QA review)
-
-- **4.1** README completo (instalación, ejemplos, screenshots)
-- **4.2** LICENSE (MIT) + CONTRIBUTING.md
-- **4.3** GitHub repo público en `github.com/franky1234/think-separator-plugin`
-- **4.4** Push + tag `v0.1.0`
-- **4.5** `npm publish --access public` (requiere npm login)
-- **4.6** Smoke test: instalar vía npm y verificar carga
-
----
-
-## Execution Order (cuando el orchestrator arranque)
-
-1. **FASE 0** (read-only, prioriza sub-fase 0.1)
-2. **FASE 1** (Architect diseña contrato)
-3. **FASE 2** (Dev implementa, QA valida cada paso)
-4. **FASE 3** (QA regression testing)
-5. **FASE 4** (Dev deploy + QA smoke final)
+- **4.1** Complete `README.md` (installation, how it works, configuration)
+- **4.2** `LICENSE` (MIT) + `CONTRIBUTING.md`
+- **4.3** GitHub repository published at `github.com/franky1234/opencode-think-separator-plugin`
+- **4.4** Git branch main synchronized
+- **4.5** `npm pack --dry-run` verified (8 essential files, 8.8 kB tarball)
+- **4.6** `bin/install.sh` executable and idempotent
 
 ---
 
 ## Risks & Mitigations
 
-| Riesgo                                       | Mitigación                                                     |
-| -------------------------------------------- | -------------------------------------------------------------- |
-| Plugin API cambió desde opencode 1.15        | FASE 0.1 + FASE 3.5 lo detecta; documentar versión mínima real |
-| Falsos positivos en detección agnóstica      | Whitelist explícita + fixture de control negativo              |
-| Render se ve mal en algunos themes           | Usar ANSI escapes estándar                                     |
-| Public npm publish falla                     | Verificar credenciales antes de FASE 4.5                       |
-| GitHub repo过早 (WIP expuesto)               | Primer push solo después de FASE 2 (MVP funcional)             |
-| Bin/dev.sh rompe si opencode no está en PATH | Documentar requisito, fail con mensaje claro                   |
+| Risk | Mitigation |
+|---|---|
+| Plugin API changed since opencode 1.15 | Verified `experimental.chat.messages.transform` stability |
+| False positives in agnostic detection | Explicit whitelist + negative control fixture |
+| Render formatting breaks in custom themes | Pure GFM Markdown blockquotes instead of hardcoded ANSI escapes |
+| Public npm publish failure | Verified `npm pack --dry-run` and `prepublishOnly` script |
+| Unclosed `<think>` tags during streaming | 3-phase regex parser recovers unclosed tags gracefully |
+| `bin/dev.sh` fails if opencode is not in PATH | Documented prerequisite with clear fallback instructions |
 
 ---
 
-## Tracking
+## Tracking & Conventions
 
-Cada fase cierra con:
+Each phase completes with:
 
-- Commit dedicado
-- Actualización de `progress.md` en `.superpowers/sdd/<plan>/` (creado por orchestrator)
-- `mem_save` en Engram con `topic_key: think-separator-task-<n>`
-
-Plan completion protocol (del orchestrator):
-
-- Triage de parked findings (apply/dismiss/defer)
-- Rewrite de `progress.md` en formato resumido
-- `mem_save` con `topic_key: think-separator-plan-complete`
+- Dedicated conventional commit
+- Progress update in documentation
+- `mem_save` in Engram persistent memory
 
 ---
 
-## Referencias cruzadas
+## Cross References
 
-- AGENTS.md — project standards
-- .harness/domains.yaml — single domain declaration
-- .harness/models.yaml — model routing (orchestrator: MiniMax-M3, qa: kimi-k2.7-code, dev: deepseek-v4-pro)
-- .opencode/nah/policy.yaml — agent permissions
-- docs/PLUGIN_API.md (FASE 0.1)
-- docs/ARCHITECTURE.md (FASE 1)
-- docs/COMPATIBILITY.md (FASE 3.6)
+- [AGENTS.md](AGENTS.md) — project standards
+- [.harness/domains.yaml](.harness/domains.yaml) — domain declaration
+- [.harness/models.yaml](.harness/models.yaml) — model routing
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture & render pipeline
+- [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) — compatibility matrix
+- [CONTRIBUTING.md](CONTRIBUTING.md) — contribution guidelines
+- [README.md](README.md) — package overview & installation guide

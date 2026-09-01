@@ -1,11 +1,10 @@
-#!/bin/bash
-# bin/harness-load.sh — dev launcher para opencode-think-separator-plugin
+#!/usr/bin/env bash
+# bin/harness-load.sh — dev launcher for opencode-think-separator-plugin
 #
-# Arranca opencode con el harness del proyecto. El harness se compone de:
+# Launches opencode with the project harness. The harness consists of:
 #   - .opencode/agent/*.md    → orchestrator, dev, qa, architect, code-reviewer
-#   - .opencode/nah/policy.yaml + .opencode/plugins/nah-policy.js → policy local
+#   - .opencode/nah/policy.yaml + .opencode/plugins/nah-policy.js → local policy
 #   - .opencode/agent/orchestrator.md → hand-written, recovery protocol
-#   - engram MCP                → global via ~/.config/opencode/, no se toca
 #   - superpowers plugin        → declarado en opencode.json del proyecto
 #
 # opencode auto-detecta .opencode/ cuando se ejecuta dentro del proyecto,
