@@ -1,5 +1,5 @@
-import {test} from "node:test"
 import assert from "node:assert/strict"
+import {test} from "node:test"
 import {defaultConfig, mergeConfig} from "../src/config.js"
 
 test('defaultConfig.label is "Reasoning"', () => {

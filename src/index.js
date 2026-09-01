@@ -23,43 +23,48 @@
  * here for testability) for a second plugin function.
  */
 
+import {mergeConfig} from "./config.js"
 import {detectReasoning, extractReasoningFromText} from "./detect-reasoning.js"
 import {renderReasoning} from "./render.js"
-import {mergeConfig} from "./config.js"
 
 /**
  * Stage 1: Classify each part into reasoning (extracted text) or clean (kept as-is).
  * For type:text parts with embedded XML reasoning tags, the tags are stripped and the
  * reasoning is captured separately; the cleaned part is kept in cleanParts.
  *
- * @param {object[]} parts
- * @returns {{ reasoningTexts: string[], cleanParts: object[] }}
+ * @param {Array<unknown>} parts
+ * @returns {{ reasoningTexts: string[], cleanParts: Array<unknown> }}
  */
 function partitionMessageParts(parts) {
+    /** @type {string[]} */
     const reasoningTexts = []
+    /** @type {Array<unknown>} */
     const cleanParts = []
 
     for (const part of parts) {
         if (!part || typeof part !== "object") continue
 
+        /** @type {{type?: string, text?: string}} */
+        const objPart = /** @type {{type?: string, text?: string}} */ (part)
+
         // Case 1: opencode-native or provider-specific reasoning parts
         if (
-            (part.type === "reasoning" || part.type === "thinking") &&
-            typeof part.text === "string" &&
-            part.text.length > 0
+            (objPart.type === "reasoning" || objPart.type === "thinking") &&
+            typeof objPart.text === "string" &&
+            objPart.text.length > 0
         ) {
-            reasoningTexts.push(part.text)
+            reasoningTexts.push(objPart.text)
             continue
         }
 
         // Case 2: text part that may contain XML reasoning tags (<think>...</think>, etc.)
-        if (part.type === "text" && typeof part.text === "string") {
-            const extracted = extractReasoningFromText(part.text)
+        if (objPart.type === "text" && typeof objPart.text === "string") {
+            const extracted = extractReasoningFromText(objPart.text)
             if (extracted.reasoningTexts.length > 0) {
                 reasoningTexts.push(...extracted.reasoningTexts)
             }
-            part.text = extracted.cleanText
-            cleanParts.push(part)
+            objPart.text = extracted.cleanText
+            cleanParts.push(objPart)
             continue
         }
 
@@ -75,8 +80,8 @@ function partitionMessageParts(parts) {
  * Builds a synthetic content[] from cleanParts (text only) and runs detectReasoning
  * on both the synthetic and the raw msg — first match wins.
  *
- * @param {object[]} cleanParts
- * @param {object} msg
+ * @param {Array<unknown>} cleanParts
+ * @param {Record<string, unknown>} msg
  * @param {number} existingReasoningCount
  * @returns {string[]} Additional reasoning texts (empty if none detected)
  */
@@ -85,11 +90,15 @@ function resolveFallbackReasoning(cleanParts, msg, existingReasoningCount) {
 
     const synthetic = {
         content: cleanParts
-            .filter((p) => p && p.type === "text")
-            .map((p) => ({type: "text", text: p.text}))
+            .filter(
+                /** @returns {p is {type?: string, text?: string}} */
+                (p) => /** @type {{type?: string}} */ (p)?.type === "text"
+            )
+            .map((p) => ({type: "text", text: /** @type {{text?: string}} */ (p).text}))
     }
-    const detection = detectReasoning(synthetic) || detectReasoning(msg)
-    if (detection && detection.reasoning) {
+    const detection =
+        detectReasoning(/** @type {Record<string, unknown>} */ (synthetic)) || detectReasoning(msg)
+    if (detection?.reasoning) {
         return [detection.reasoning]
     }
     return []
@@ -101,7 +110,7 @@ function resolveFallbackReasoning(cleanParts, msg, existingReasoningCount) {
  *
  * Mutates `cleanParts` in-place (same behavior as the original code).
  *
- * @param {object[]} cleanParts
+ * @param {Array<{type?: string, text?: string}>} cleanParts
  * @param {string[]} reasoningTexts
  * @param {string} label
  */
@@ -116,13 +125,20 @@ function injectReasoningBlock(cleanParts, reasoningTexts, label) {
     }
 }
 
-export const ThinkSeparator = async (input, options) => {
+export const ThinkSeparator = async (
+    /** @type {Record<string, unknown> | undefined} */ input,
+    /** @type {import("../types/index.js").UserConfig | undefined} */ options
+) => {
     const config = mergeConfig(options || {})
     return {
-        "experimental.chat.messages.transform": async (_hookInput, output) => {
+        "experimental.chat.messages.transform": async (
+            /** @type {Record<string, unknown> | undefined} */ _hookInput,
+            /** @type {{messages?: Array<Record<string, unknown>>} | undefined} */ output
+        ) => {
             if (!output || !Array.isArray(output.messages)) return
             for (const msg of output.messages) {
-                if (msg.info && msg.info.role !== "assistant") continue
+                if (msg.info && /** @type {{role?: string}} */ (msg.info).role !== "assistant")
+                    continue
                 transformMessage(msg, config.label)
             }
         }
@@ -140,19 +156,24 @@ export const ThinkSeparator = async (input, options) => {
  * - For text parts with XML tags: tags stripped, reasoning captured separately.
  * - For other parts (tool_use, etc.): preserved untouched, in original order.
  *
- * @param {object} msg - OpenCode assistant message; mutated in place.
+ * @param {Record<string, unknown> | null | undefined} msg - OpenCode assistant message; mutated in place.
  * @param {string} label - Header label for the reasoning block.
  * @returns {void}
  */
 export function transformMessage(msg, label) {
     if (!msg || !Array.isArray(msg.parts)) return
 
-    const {reasoningTexts, cleanParts} = partitionMessageParts(msg.parts)
+    const msgParts = /** @type {Array<unknown>} */ (msg.parts)
+    const {reasoningTexts, cleanParts} = partitionMessageParts(msgParts)
     const additionalTexts = resolveFallbackReasoning(cleanParts, msg, reasoningTexts.length)
     const allReasoningTexts = [...reasoningTexts, ...additionalTexts]
     if (allReasoningTexts.length === 0) return
 
-    injectReasoningBlock(cleanParts, allReasoningTexts, label)
+    injectReasoningBlock(
+        /** @type {Array<{type?: string, text?: string}>} */ (/** @type {unknown} */ (cleanParts)),
+        allReasoningTexts,
+        label
+    )
     msg.parts = cleanParts
 }
 

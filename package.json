@@ -4,6 +4,7 @@
     "description": "Opencode TUI plugin that visually separates model reasoning blocks from responses. Agnostic to provider (Anthropic, OpenAI, Google, MiniMax).",
     "type": "module",
     "main": "src/index.js",
+    "types": "./types/index.d.ts",
     "exports": {
         ".": "./src/index.js"
     },
@@ -12,6 +13,7 @@
     },
     "files": [
         "src/",
+        "types/",
         "bin/install.sh",
         "README.md",
         "LICENSE"
@@ -19,7 +21,9 @@
     "scripts": {
         "test": "node --test test/*.test.js",
         "test:watch": "node --test --watch test/*.test.js",
-        "lint": "echo 'TODO: add biome or eslint in FASE 2' && exit 0",
+        "lint": "biome check src test",
+        "check:types": "tsc --noEmit",
+        "check:fix": "npm run format && npm run lint && npm run check:types && npm test",
         "format": "npx prettier --write \"src/**/*.js\" \"test/**/*.js\"",
         "format:check": "npx prettier --check \"src/**/*.js\" \"test/**/*.js\"",
         "prettier:fix": "npx prettier --write \"src/**/*.js\" \"test/**/*.js\"",
@@ -29,7 +33,9 @@
         "harness:dev": "bash bin/harness-load.sh"
     },
     "devDependencies": {
-        "prettier": "^3.5.2"
+        "@biomejs/biome": "^1.9.4",
+        "prettier": "^3.5.2",
+        "typescript": "^5.6.3"
     },
     "engines": {
         "node": ">=18.0.0"

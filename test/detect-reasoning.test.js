@@ -1,12 +1,12 @@
-import {test} from "node:test"
 import assert from "node:assert/strict"
 import {readFileSync} from "node:fs"
-import {join, dirname} from "node:path"
+import {dirname, join} from "node:path"
+import {test} from "node:test"
 import {fileURLToPath} from "node:url"
 import {
+    REASONING_FIELDS,
     detectReasoning,
-    extractReasoningFromText,
-    REASONING_FIELDS
+    extractReasoningFromText
 } from "../src/detect-reasoning.js"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))

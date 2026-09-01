@@ -67,6 +67,7 @@ export function extractReasoningFromText(text) {
         return {reasoningTexts: [], cleanText: text || ""}
     }
 
+    /** @type {string[]} */
     const reasoningTexts = []
 
     // 1. Extract and remove closed tags first
@@ -97,7 +98,7 @@ export function extractReasoningFromText(text) {
  * Detection strategy: scans `message.content[]` for blocks whose `type` is in
  * REASONING_SET. Returns the first match (Anthropic / MiniMax style thinking blocks).
  *
- * @param {object} message
+ * @param {{content?: Array<{type: string, [k: string]: unknown}>}} message
  * @returns {{reasoning: string, source: string, kind: "block"} | null}
  */
 function detectInContentBlocks(message) {
@@ -118,7 +119,7 @@ function detectInContentBlocks(message) {
  * Returns the first text block whose content contains extractable reasoning, with
  * all extracted reasoning blocks joined by `\n\n`.
  *
- * @param {object} message
+ * @param {{content?: Array<{type: string, text?: string}>}} message
  * @returns {{reasoning: string, source: "tag", kind: "text_tag"} | null}
  */
 function detectInContentTextTags(message) {
@@ -147,7 +148,7 @@ function detectInContentTextTags(message) {
  * Detection strategy: scans top-level `message[field]` for fields in REASONING_FIELDS.
  * Iterates REASONING_FIELDS in declared order so earlier whitelisted names win.
  *
- * @param {object} message
+ * @param {Record<string, unknown>} message
  * @returns {{reasoning: string, source: string, kind: "field"} | null}
  */
 function detectInTopLevelFields(message) {
@@ -163,7 +164,7 @@ function detectInTopLevelFields(message) {
  * Detection strategy: scans `message.content` when it is a raw string with XML
  * reasoning tags (e.g. providers that emit a plain string with `<think>...</think>`).
  *
- * @param {object} message
+ * @param {{content?: unknown}} message
  * @returns {{reasoning: string, source: "tag", kind: "text_tag"} | null}
  */
 function detectInStringContent(message) {
@@ -194,7 +195,7 @@ const DETECTION_STRATEGIES = Object.freeze([
  * Runs the detection strategies in priority order and returns the first match.
  * Returns `null` when the message is invalid or no strategy detects reasoning.
  *
- * @param {object} message
+ * @param {Record<string, unknown> | null | undefined} message
  * @returns {{reasoning: string, source: string, kind: string} | null}
  */
 export function detectReasoning(message) {
