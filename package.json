@@ -50,10 +50,10 @@
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/franky1234/think-separator-plugin.git"
+        "url": "git+https://github.com/franky1234/opencode-think-separator-plugin.git"
     },
     "bugs": {
-        "url": "https://github.com/franky1234/think-separator-plugin/issues"
+        "url": "https://github.com/franky1234/opencode-think-separator-plugin/issues"
     },
-    "homepage": "https://github.com/franky1234/think-separator-plugin#readme"
+    "homepage": "https://github.com/franky1234/opencode-think-separator-plugin#readme"
 }
