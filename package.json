@@ -6,7 +6,10 @@
     "main": "src/index.js",
     "types": "./types/index.d.ts",
     "exports": {
-        ".": "./src/index.js"
+        ".": "./src/index.js",
+        "./core": "./src/core.js",
+        "./stream": "./src/stream.js",
+        "./render": "./src/render.js"
     },
     "bin": {
         "opencode-think-separator-plugin-install": "bin/install.sh"
