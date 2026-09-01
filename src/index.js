@@ -27,26 +27,19 @@ import {detectReasoning, extractReasoningFromText} from "./detect-reasoning.js"
 import {renderReasoning} from "./render.js"
 import {mergeConfig} from "./config.js"
 
-export const ThinkSeparator = async (input, options) => {
-    const config = mergeConfig(options || {})
-    return {
-        "experimental.chat.messages.transform": async (_hookInput, output) => {
-            if (!output || !Array.isArray(output.messages)) return
-            for (const msg of output.messages) {
-                if (msg.info && msg.info.role !== "assistant") continue
-                transformMessage(msg, config.label)
-            }
-        }
-    }
-}
-
-export function transformMessage(msg, label) {
-    if (!msg || !Array.isArray(msg.parts)) return
-
+/**
+ * Stage 1: Classify each part into reasoning (extracted text) or clean (kept as-is).
+ * For type:text parts with embedded XML reasoning tags, the tags are stripped and the
+ * reasoning is captured separately; the cleaned part is kept in cleanParts.
+ *
+ * @param {object[]} parts
+ * @returns {{ reasoningTexts: string[], cleanParts: object[] }}
+ */
+function partitionMessageParts(parts) {
     const reasoningTexts = []
     const cleanParts = []
 
-    for (const part of msg.parts) {
+    for (const part of parts) {
         if (!part || typeof part !== "object") continue
 
         // Case 1: opencode-native or provider-specific reasoning parts
@@ -74,34 +67,93 @@ export function transformMessage(msg, label) {
         cleanParts.push(part)
     }
 
-    // If no reasoning was found in parts or text tags, try top-level object fields (defense-in-depth)
-    if (reasoningTexts.length === 0) {
-        const synthetic = {
-            content: cleanParts
-                .filter((p) => p && p.type === "text")
-                .map((p) => ({type: "text", text: p.text}))
-        }
-        const detection = detectReasoning(synthetic) || detectReasoning(msg)
-        if (detection && detection.reasoning) {
-            reasoningTexts.push(detection.reasoning)
-        }
-    }
+    return {reasoningTexts, cleanParts}
+}
 
-    // If still no reasoning, leave message as is
-    if (reasoningTexts.length === 0) {
-        return
-    }
+/**
+ * Stage 2: Defense-in-depth fallback. Only runs when Stage 1 found NO reasoning.
+ * Builds a synthetic content[] from cleanParts (text only) and runs detectReasoning
+ * on both the synthetic and the raw msg — first match wins.
+ *
+ * @param {object[]} cleanParts
+ * @param {object} msg
+ * @param {number} existingReasoningCount
+ * @returns {string[]} Additional reasoning texts (empty if none detected)
+ */
+function resolveFallbackReasoning(cleanParts, msg, existingReasoningCount) {
+    if (existingReasoningCount > 0) return []
 
+    const synthetic = {
+        content: cleanParts
+            .filter((p) => p && p.type === "text")
+            .map((p) => ({type: "text", text: p.text}))
+    }
+    const detection = detectReasoning(synthetic) || detectReasoning(msg)
+    if (detection && detection.reasoning) {
+        return [detection.reasoning]
+    }
+    return []
+}
+
+/**
+ * Stage 3: Format the reasoning block and prepend it to the first text part of
+ * cleanParts. If no text part exists, insert a new leading text part.
+ *
+ * Mutates `cleanParts` in-place (same behavior as the original code).
+ *
+ * @param {object[]} cleanParts
+ * @param {string[]} reasoningTexts
+ * @param {string} label
+ */
+function injectReasoningBlock(cleanParts, reasoningTexts, label) {
     const reasoningBlock = reasoningTexts.map((t) => renderReasoning(t, label)).join("\n")
 
-    // Prepend reasoning block to the first text part, or insert a new text part if none exist
     const firstTextIndex = cleanParts.findIndex((p) => p && p.type === "text")
     if (firstTextIndex !== -1) {
         cleanParts[firstTextIndex].text = reasoningBlock + cleanParts[firstTextIndex].text
-        msg.parts = cleanParts
     } else {
-        msg.parts = [{type: "text", text: reasoningBlock}, ...cleanParts]
+        cleanParts.unshift({type: "text", text: reasoningBlock})
     }
+}
+
+export const ThinkSeparator = async (input, options) => {
+    const config = mergeConfig(options || {})
+    return {
+        "experimental.chat.messages.transform": async (_hookInput, output) => {
+            if (!output || !Array.isArray(output.messages)) return
+            for (const msg of output.messages) {
+                if (msg.info && msg.info.role !== "assistant") continue
+                transformMessage(msg, config.label)
+            }
+        }
+    }
+}
+
+/**
+ * Public: Transform one assistant message by rewriting reasoning parts into a
+ * styled text block, while preserving all other parts (tool calls, images, etc.).
+ *
+ * Behavior contract (verified by 8 tests in test/plugin.test.js):
+ * - No-op when msg or msg.parts is invalid.
+ * - No-op when no reasoning is found (parts unchanged).
+ * - For reasoning parts: removed, merged into a leading text part.
+ * - For text parts with XML tags: tags stripped, reasoning captured separately.
+ * - For other parts (tool_use, etc.): preserved untouched, in original order.
+ *
+ * @param {object} msg - OpenCode assistant message; mutated in place.
+ * @param {string} label - Header label for the reasoning block.
+ * @returns {void}
+ */
+export function transformMessage(msg, label) {
+    if (!msg || !Array.isArray(msg.parts)) return
+
+    const {reasoningTexts, cleanParts} = partitionMessageParts(msg.parts)
+    const additionalTexts = resolveFallbackReasoning(cleanParts, msg, reasoningTexts.length)
+    const allReasoningTexts = [...reasoningTexts, ...additionalTexts]
+    if (allReasoningTexts.length === 0) return
+
+    injectReasoningBlock(cleanParts, allReasoningTexts, label)
+    msg.parts = cleanParts
 }
 
 export default {
