@@ -114,8 +114,8 @@ let _createReasoningStreamParser = null
  */
 export async function createReasoningStreamParser(options) {
     if (_createReasoningStreamParser === null) {
-        // @ts-expect-error -- ./stream.js is added by Phase 4 / Task 4 of the v2 upgrade;
-        // remove this suppression once that file exists.
+        // Lazy dynamic import resolved once and cached. `./stream.js` is
+        // introduced in Phase 4 (Task 4) of the v2 upgrade.
         const mod = await import("./stream.js")
         _createReasoningStreamParser = mod.createReasoningStreamParser
     }
