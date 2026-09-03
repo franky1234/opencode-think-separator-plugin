@@ -81,14 +81,68 @@ export interface OpenCodeMessage {
 }
 
 /**
+ * Per-model override payload. Both fields are optional; an absent field
+ * falls back to the value inherited from the base config when resolved via
+ * `resolveModelConfig`.
+ *
+ * - `style`: render-style override (validated against `RenderStyle`).
+ * - `label`: header-label override (any non-empty string is accepted).
+ */
+export interface ModelConfigOverride {
+    /** Render-style override applied when the model pattern matches. */
+    style?: RenderStyle;
+    /** Header-label override applied when the model pattern matches. */
+    label?: string;
+}
+
+/**
+ * Glob pattern used to match a model id. Two forms are supported:
+ *
+ * - **Exact**: `"deepseek/v4-pro"` matches only the exact id.
+ * - **Prefix wildcard**: ends in `/*` (e.g. `"deepseek/*"`); matches every
+ *   id that starts with the prefix followed by `/`. Patterns with `*` in
+ *   any other position fall back to exact-equality matching (the parser
+ *   stays total and crash-free).
+ *
+ * Iteration is insertion order; first match wins.
+ */
+export type ModelOverridePattern = string;
+
+/**
+ * Map of model-id patterns to per-model overrides. Used by
+ * `resolveModelConfig(modelId, baseConfig)` to look up the effective
+ * `{label, style}` for the current message's model.
+ *
+ * Indexed by `ModelOverridePattern` (string) so users can supply arbitrary
+ * pattern keys; runtime validation in `patternMatches` decides whether a
+ * pattern is exact or prefix-wildcard.
+ */
+export type ModelConfigMap = Readonly<Record<string, ModelConfigOverride>>;
+
+/**
  * Frozen plugin configuration after `mergeConfig` resolves user overrides.
  * Returned as a fresh shallow copy on every call.
+ *
+ * `models` and `customTags` are OMITTED when the user did not supply them —
+ * this keeps `mergeConfig({})` deepEqual to `defaultConfig` for back-compat.
  */
 export interface PluginConfig {
     /** Header label shown above the reasoning block. */
     label: string;
     /** Render strategy applied to extracted reasoning (see `RenderStyle`). */
     style: RenderStyle;
+    /**
+     * Per-model override map. Present only when the user supplied a
+     * non-empty `models` object. Empty maps are dropped silently.
+     */
+    models?: ModelConfigMap;
+    /**
+     * Extra XML tag names the detector should recognise in addition to
+     * its built-in defaults. Present only when the user supplied a
+     * non-empty array. Entries that duplicate a built-in tag are deduped
+     * silently by the detector.
+     */
+    customTags?: ReadonlyArray<string>;
 }
 
 /**
@@ -105,6 +159,21 @@ export interface UserConfig {
      * allowed set. Values are case-sensitive.
      */
     style?: RenderStyle;
+    /**
+     * Optional per-model override map. Must be a plain object; non-objects
+     * (including strings, arrays, null) are silently dropped by `mergeConfig`.
+     *
+     * Patterns are evaluated in insertion order (first match wins) by
+     * `resolveModelConfig`. See `ModelOverridePattern` for the supported
+     * glob forms.
+     */
+    models?: ModelConfigMap;
+    /**
+     * Optional extra XML tag names. Must be an array of non-empty strings;
+     * any other shape is silently dropped. Entries that duplicate a
+     * built-in tag name are deduped silently by the detector.
+     */
+    customTags?: ReadonlyArray<string>;
 }
 
 /**
