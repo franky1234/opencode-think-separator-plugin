@@ -22,13 +22,22 @@ export type RenderStyle = "markdown" | "details" | "strip" | "raw";
 
 /**
  * Options accepted by `renderReasoning` (and related render functions) when
- * callers want to override the plugin-level config (label, style).
+ * callers want to override the plugin-level config (label, style, metadata).
+ *
+ * `metadata` is forwarded to the renderer so the header can show a duration
+ * / token badge. Only the `markdown` renderer currently surfaces it.
  */
 export interface RenderOptions {
     /** Header label shown above the reasoning block. */
     label?: string;
     /** Rendering strategy to apply. */
     style?: RenderStyle;
+    /**
+     * Optional reasoning metadata for header badges (e.g. duration, tokens).
+     * Forwarded to the chosen renderer; only `markdown` currently renders a
+     * badge from it. All fields are optional and silently ignored if absent.
+     */
+    metadata?: ReasoningMetadata;
 }
 
 /**
@@ -177,10 +186,35 @@ export interface UserConfig {
 }
 
 /**
+ * Thinking-metadata side-channel attached to a `DetectionResult` when the
+ * source message carries well-formed `thinking_duration_ms`,
+ * `thinking_budget`, or `thinking_tokens` fields. All three are optional;
+ * the renderer can display whatever subset is present.
+ *
+ * Only non-negative finite numbers are surfaced. `0` is a valid value
+ * (model produced zero reasoning) and is preserved. NaN, Infinity,
+ * strings, and negative numbers are dropped silently.
+ */
+export interface ReasoningMetadata {
+    /** Wall-clock duration of the reasoning phase, in milliseconds. */
+    durationMs?: number;
+    /** Token budget allocated for reasoning (model-supplied upper bound). */
+    budget?: number;
+    /** Actual reasoning tokens consumed. */
+    tokens?: number;
+}
+
+/**
  * Result of running `detectReasoning` on a message.
  *
  * `null` is returned when the message is invalid or no detection strategy
  * matches.
+ *
+ * The `metadata` side-channel is populated when the message carries
+ * well-formed thinking-metadata fields (`thinking_duration_ms`,
+ * `thinking_budget`, `thinking_tokens`). It runs alongside the detection
+ * pass — first non-empty detection wins, and metadata is attached so the
+ * renderer can show duration / token badges without a second scan.
  */
 export interface DetectionResult {
     /** The extracted reasoning text. */
@@ -189,6 +223,11 @@ export interface DetectionResult {
     source: string;
     /** Classification of how the reasoning was found. */
     kind: "block" | "text_tag" | "field";
+    /**
+     * Optional thinking-metadata side-channel. Present only when the
+     * message contains at least one well-formed metadata field.
+     */
+    metadata?: ReasoningMetadata;
 }
 
 /**

@@ -1,19 +1,44 @@
-name: Publish Node.js Package
+# Opencode Think Separator Plugin — npm publish workflow.
+#
+# This workflow publishes the package to the public npm registry when a
+# semver tag of the form v*.*.* (e.g. v0.3.0, v1.0.0) is pushed.
+#
+# It uses npm Provenance (OIDC) to cryptographically attest that the
+# published artifact was built inside this GitHub Actions runner and
+# originates from this exact commit on the tag — see:
+# https://docs.npmjs.com/generating-provenance-statements
+#
+# Provenance REQUIRES the OIDC `id-token: write` permission at the job
+# or workflow level. Without it, `npm publish --provenance` fails.
+#
+# Sequence:
+#   1. checkout @ pinned tag (actions/checkout@v4)
+#   2. setup Node 20 (npm >= 9.5 required for --provenance)
+#   3. npm ci (package-lock.json is committed — reproducible install)
+#   4. npm test (regression guard) + npm run check:fix (lint + types + format)
+#   5. npm run prepublishOnly (extra gate: `node --check src/index.js && npm test`)
+#   6. npm publish --provenance --access public
+#
+# Token fallback:
+#   - `secrets.NPM_TOKEN` — classic automation token (manual setup)
+#   - `secrets.NODE_AUTH_TOKEN` — populated by `actions/setup-node` from
+#     the OIDC workflow token when `registry-url` is set. Preferred for
+#     trusted publishing without a long-lived secret.
+
+name: Publish to npm
 
 on:
   push:
     tags:
       - "v*.*.*"
-  release:
-    types: [created]
+
+permissions:
+  contents: read
+  id-token: write # REQUIRED for npm Provenance (OIDC)
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,16 +46,22 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
           registry-url: "https://registry.npmjs.org/"
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run verification & tests
+      - name: Run tests
+        run: npm test
+
+      - name: Run lint, format, and type checks
         run: npm run check:fix
 
-      - name: Publish to npm
-        run: npm publish --provenance
+      - name: Run prepublish gate
+        run: npm run prepublishOnly
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || secrets.NODE_AUTH_TOKEN }}

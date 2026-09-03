@@ -5,6 +5,8 @@ import {test} from "node:test"
 import {fileURLToPath} from "node:url"
 import {
     REASONING_FIELDS,
+    REASONING_TAG_NAMES,
+    compileReasoningTagRegex,
     detectReasoning,
     extractReasoningFromText
 } from "../src/detect-reasoning.js"
@@ -109,4 +111,157 @@ test("detectReasoning detects XML tags inside string message.content", () => {
     assert.ok(r)
     assert.equal(r.source, "tag")
     assert.equal(r.reasoning, "DeepSeek-R1 raw text")
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// Component 2 (v3 upgrade): dynamic tag compilation + metadata extraction
+// ──────────────────────────────────────────────────────────────────────────
+
+test("internal_thought tag is detected by default (REASONING_TAG_NAMES expanded)", () => {
+    const text = "<internal_thought>Hidden internal reasoning</internal_thought>Final answer."
+    const {reasoningTexts, cleanText} = extractReasoningFromText(text)
+    assert.equal(reasoningTexts.length, 1)
+    assert.equal(reasoningTexts[0], "Hidden internal reasoning")
+    assert.equal(cleanText, "Final answer.")
+    assert.ok(
+        REASONING_TAG_NAMES.includes("internal_thought"),
+        "internal_thought must be in the default REASONING_TAG_NAMES whitelist"
+    )
+})
+
+test("extractReasoningFromText(text, [custom_tag]) recognises custom tag but NOT think", () => {
+    const text = "<custom_tag>Custom reasoning</custom_tag> after.<think>Built-in tag</think>"
+    const {reasoningTexts, cleanText} = extractReasoningFromText(text, ["custom_tag"])
+    assert.equal(
+        reasoningTexts.length,
+        1,
+        "only the custom tag should match; built-ins are dropped"
+    )
+    assert.equal(reasoningTexts[0], "Custom reasoning")
+    assert.match(cleanText, /after\./)
+    assert.match(
+        cleanText,
+        /<think>Built-in tag<\/think>/,
+        "unrecognized <think> should be left untouched"
+    )
+})
+
+test("extractReasoningFromText(text, [think]) works with an explicit tags array (no behaviour change)", () => {
+    const text = "<think>Still works explicitly</think>Final."
+    const {reasoningTexts, cleanText} = extractReasoningFromText(text, ["think"])
+    assert.equal(reasoningTexts.length, 1)
+    assert.equal(reasoningTexts[0], "Still works explicitly")
+    assert.equal(cleanText, "Final.")
+})
+
+test("extractReasoningFromText with empty/invalid tags array falls back to defaults", () => {
+    const text = "<think>Built-in default</think> final."
+    const fromEmpty = extractReasoningFromText(text, [])
+    const fromStrings = extractReasoningFromText(text, ["", 42, null])
+    const fromDefaults = extractReasoningFromText(text)
+    assert.deepEqual(fromEmpty, fromDefaults, "[] should fall back to defaults")
+    assert.deepEqual(
+        fromStrings,
+        fromDefaults,
+        "all-non-string entries should fall back to defaults"
+    )
+})
+
+test("compileReasoningTagRegex(REASONING_TAG_NAMES) returns the same regex set on repeated calls (cache hit)", () => {
+    const first = compileReasoningTagRegex(REASONING_TAG_NAMES)
+    const second = compileReasoningTagRegex(REASONING_TAG_NAMES)
+    assert.ok(first && second, "should compile regex set")
+    assert.strictEqual(
+        first.CLOSED,
+        second.CLOSED,
+        "CLOSED regex should be reference-equal across calls (cache hit)"
+    )
+    assert.strictEqual(
+        first.UNCLOSED,
+        second.UNCLOSED,
+        "UNCLOSED regex should be reference-equal across calls (cache hit)"
+    )
+    assert.strictEqual(
+        first.ORPHAN,
+        second.ORPHAN,
+        "ORPHAN regex should be reference-equal across calls (cache hit)"
+    )
+})
+
+test("compileReasoningTagRegex returns a fresh regex set when the input array differs", () => {
+    const defaultRegexes = compileReasoningTagRegex(REASONING_TAG_NAMES)
+    const customRegexes = compileReasoningTagRegex(["custom_tag"])
+    assert.notStrictEqual(
+        defaultRegexes.CLOSED,
+        customRegexes.CLOSED,
+        "different array references must produce distinct regex objects"
+    )
+    const text = "<custom_tag>Hello</custom_tag>"
+    const m = customRegexes.CLOSED.exec(text)
+    assert.ok(m, "custom regex should match a custom tag")
+    assert.equal(m[1], "custom_tag")
+})
+
+test("detectReasoning extracts thinking_duration_ms as metadata.durationMs", () => {
+    const msg = {reasoning: "Some reasoning.", thinking_duration_ms: 1200}
+    const r = detectReasoning(msg)
+    assert.ok(r)
+    assert.equal(r.source, "reasoning")
+    assert.equal(r.kind, "field")
+    assert.ok(r.metadata, "metadata should be present when a duration is supplied")
+    assert.equal(r.metadata.durationMs, 1200)
+})
+
+test("detectReasoning extracts thinking_budget and thinking_tokens together", () => {
+    const msg = {reasoning: "Some reasoning.", thinking_budget: 4096, thinking_tokens: 250}
+    const r = detectReasoning(msg)
+    assert.ok(r)
+    assert.ok(r.metadata)
+    assert.equal(r.metadata.budget, 4096)
+    assert.equal(r.metadata.tokens, 250)
+    assert.equal(r.metadata.durationMs, undefined, "no duration supplied → field absent")
+})
+
+test("detectReasoning accepts 0 as a valid metadata value (model produced zero reasoning)", () => {
+    const msg = {reasoning: "Some reasoning.", thinking_duration_ms: 0, thinking_tokens: 0}
+    const r = detectReasoning(msg)
+    assert.ok(r)
+    assert.ok(r.metadata)
+    assert.equal(r.metadata.durationMs, 0)
+    assert.equal(r.metadata.tokens, 0)
+})
+
+test("detectReasoning excludes negative / non-number / non-finite metadata values", () => {
+    const negative = detectReasoning({reasoning: "x", thinking_duration_ms: -5})
+    assert.ok(negative)
+    assert.equal(negative.metadata, undefined, "negative number must not appear in metadata")
+
+    const stringified = detectReasoning({reasoning: "x", thinking_duration_ms: "1200"})
+    assert.ok(stringified)
+    assert.equal(stringified.metadata, undefined, "string values must not appear in metadata")
+
+    const nan = detectReasoning({reasoning: "x", thinking_budget: Number.NaN})
+    assert.ok(nan)
+    assert.equal(nan.metadata, undefined, "NaN must not appear in metadata")
+
+    const infinity = detectReasoning({reasoning: "x", thinking_tokens: Number.POSITIVE_INFINITY})
+    assert.ok(infinity)
+    assert.equal(infinity.metadata, undefined, "Infinity must not appear in metadata")
+})
+
+test("detectReasoning returns null → no metadata either", () => {
+    const r = detectReasoning(null)
+    assert.equal(r, null)
+})
+
+test("detectReasoning(text-tag) carries metadata from the same message", () => {
+    const msg = {
+        content: [{type: "text", text: "<think>Reasoning</think> Answer."}],
+        thinking_duration_ms: 999
+    }
+    const r = detectReasoning(msg)
+    assert.ok(r)
+    assert.equal(r.kind, "text_tag")
+    assert.ok(r.metadata)
+    assert.equal(r.metadata.durationMs, 999)
 })
