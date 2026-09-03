@@ -22,13 +22,22 @@ export type RenderStyle = "markdown" | "details" | "strip" | "raw";
 
 /**
  * Options accepted by `renderReasoning` (and related render functions) when
- * callers want to override the plugin-level config (label, style).
+ * callers want to override the plugin-level config (label, style, metadata).
+ *
+ * `metadata` is forwarded to the renderer so the header can show a duration
+ * / token badge. Only the `markdown` renderer currently surfaces it.
  */
 export interface RenderOptions {
     /** Header label shown above the reasoning block. */
     label?: string;
     /** Rendering strategy to apply. */
     style?: RenderStyle;
+    /**
+     * Optional reasoning metadata for header badges (e.g. duration, tokens).
+     * Forwarded to the chosen renderer; only `markdown` currently renders a
+     * badge from it. All fields are optional and silently ignored if absent.
+     */
+    metadata?: ReasoningMetadata;
 }
 
 /**
