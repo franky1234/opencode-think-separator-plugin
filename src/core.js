@@ -82,6 +82,67 @@ export {defaultConfig} from "./config.js"
 export {mergeConfig} from "./config.js"
 
 /**
+ * Resolve the effective plugin config for a given model id, applying any
+ * matching entry in `baseConfig.models` as an override on top of the base
+ * `{label, style}` fields.
+ *
+ * Re-exported from `./config.js`. See that module for full contract.
+ *
+ * @param {string|null|undefined} modelId
+ * @param {import("../types/index.js").PluginConfig} baseConfig
+ * @returns {import("../types/index.js").PluginConfig}
+ */
+export {resolveModelConfig} from "./config.js"
+
+/**
+ * Compile a memoized 3-phase regex set for a given list of reasoning tag
+ * names. Used by `extractReasoningFromText` and `detectReasoning` to scan
+ * provider output for embedded XML reasoning blocks. The result is cached
+ * per input array reference, so repeated calls with the frozen default tag
+ * list hit the cache.
+ *
+ * Re-exported from `./detect-reasoning.js`. See that module for full contract.
+ *
+ * @param {ReadonlyArray<string>} tags
+ * @returns {{CLOSED: RegExp, UNCLOSED: RegExp, ORPHAN: RegExp}}
+ */
+export {compileReasoningTagRegex} from "./detect-reasoning.js"
+
+/**
+ * Pull well-formed thinking-metadata fields (`thinking_duration_ms`,
+ * `thinking_budget`, `thinking_tokens`) off a message. Returns `undefined`
+ * when no field is usable, otherwise a partial object with the supplied keys.
+ *
+ * Re-exported from `./detect-reasoning.js`. See that module for full contract.
+ *
+ * @param {Record<string, unknown> | null | undefined} message
+ * @returns {{durationMs?: number, budget?: number, tokens?: number} | undefined}
+ */
+export {extractMetadata} from "./detect-reasoning.js"
+
+/**
+ * Format a duration in milliseconds as a compact badge (`500ms` / `~1.2s` /
+ * `~1m 5s`). Returns `""` for nullish, negative, or non-finite input.
+ *
+ * Re-exported from `./render.js`. See that module for full contract.
+ *
+ * @param {number|null|undefined} ms
+ * @returns {string}
+ */
+export {formatDuration} from "./render.js"
+
+/**
+ * Format a token count as a compact badge (`1 token` / `450 tokens`). Returns
+ * `""` for nullish, negative, or non-finite input.
+ *
+ * Re-exported from `./render.js`. See that module for full contract.
+ *
+ * @param {number|null|undefined} n
+ * @returns {string}
+ */
+export {formatTokens} from "./render.js"
+
+/**
  * Cached reference to `createReasoningStreamParser` from `./stream.js`.
  *
  * `./stream.js` will be introduced in Phase 4 (Task 4) of the v2 upgrade
