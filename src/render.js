@@ -16,9 +16,10 @@
  * when supplied — e.g. `> ### ── Reasoning (~1.2s, 450 tokens) ──`. When no
  * metadata is provided the header is byte-identical to v0.2.0.
  *
- * `maxLines` truncates the reasoning text before rendering, appending an
- * italic elision line `> *... [+N lines of reasoning truncated]...*` that
- * picks up the surrounding render style.
+ * `maxLines` truncates the reasoning text before rendering, appending a plain
+ * `... [+N lines of reasoning truncated]...` indicator that the chosen renderer
+ * decorates to match its style (e.g. `> *... [+N lines of reasoning truncated]...*`
+ * under `markdown`, `> ... [+N lines of reasoning truncated]...` under `quote`).
  */
 
 /**
@@ -197,12 +198,18 @@ function renderMarkdownBody(reasoningText) {
 }
 
 /**
- * Truncate a multi-line text to at most `maxLines` lines, appending a note
- * indicating how many lines were dropped. Used by `renderReasoning` to honour
- * the user's `maxLines` config before delegating to the chosen renderer. The
- * resulting string is meant to be passed verbatim through whichever render
- * style is active — the appended indicator is itself a blockquote-prefixed
- * italic line, so it picks up the same decoration as the surrounding body.
+ * Truncate a multi-line text to at most `maxLines` lines, appending a plain
+ * note indicating how many lines were dropped. Used by `renderReasoning` to
+ * honour the user's `maxLines` config before delegating to the chosen renderer.
+ *
+ * IMPORTANT: this helper returns PLAIN TEXT (no blockquote prefix, no italic
+ * asterisks). The renderer is responsible for applying the surrounding style to
+ * the appended indicator line — this lets the indicator pick up the right
+ * decoration depending on the active style (`markdown` → `> *…*`, `quote` →
+ * `> …`, `compact` → counted as one more line in the badge, `details`/`strip`/
+ * `raw` → emitted verbatim inside the body). Pre-formatting the indicator here
+ * would cause double-wrapping because renderers treat every body line as
+ * raw content and apply their own blockquote wrapping.
  *
  * If the input has fewer or equal lines than `maxLines`, it is returned
  * unchanged. `maxLines` that does not parse as a positive integer disables
@@ -212,7 +219,7 @@ function renderMarkdownBody(reasoningText) {
  * @param {string} text - Raw reasoning text (may contain newlines).
  * @param {*} maxLines - Maximum number of lines to retain (positive integer).
  * @returns {string} The original text when under the limit, otherwise the
- *   first `maxLines` lines followed by a blockquote-prefixed truncation note.
+ *   first `maxLines` lines followed by a plain `... [+N lines of reasoning truncated]...` indicator line.
  */
 export function truncateLines(text, maxLines) {
     if (!Number.isInteger(maxLines) || maxLines <= 0) {
@@ -224,7 +231,7 @@ export function truncateLines(text, maxLines) {
     }
     const retained = lines.slice(0, maxLines).join("\n")
     const remaining = lines.length - maxLines
-    return `${retained}\n> *... [+${remaining} lines of reasoning truncated]...*`
+    return `${retained}\n... [+${remaining} lines of reasoning truncated]...`
 }
 
 /**

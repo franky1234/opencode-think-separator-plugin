@@ -202,7 +202,10 @@ test("pipeline: ThinkSeparator factory tolerates completely missing msg.info", a
 test("pipeline: transformMessage unifies multiple reasoning blocks under a single header", () => {
     const msg = {
         parts: [
-            {type: "text", text: "<think>part one</think> Middle text. <think>part two</think> End."}
+            {
+                type: "text",
+                text: "<think>part one</think> Middle text. <think>part two</think> End."
+            }
         ]
     }
     transformMessage(msg)

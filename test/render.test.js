@@ -102,7 +102,7 @@ test("renderReasoning: undefined second argument uses defaults", () => {
     assert.match(out, /> \*hello\*/)
 })
 
-test("RENDER_STYLES map exposes all four styles", () => {
+test("RENDER_STYLES map exposes the original four styles (markdown, details, strip, raw)", () => {
     assert.equal(typeof RENDER_STYLES.markdown, "function")
     assert.equal(typeof RENDER_STYLES.details, "function")
     assert.equal(typeof RENDER_STYLES.strip, "function")
@@ -356,6 +356,33 @@ test("renderReasoning truncates when lines exceed maxLines", () => {
     assert.match(rendered, /Line 5/)
     assert.doesNotMatch(rendered, /Line 6/)
     assert.match(rendered, /\[\+15 lines of reasoning truncated\]/)
+})
+
+test("renderReasoning maxLines indicator uses correct markdown formatting", () => {
+    const longText = Array.from({length: 10}, (_, i) => `Line ${i + 1}`).join("\n")
+    const rendered = renderReasoning(longText, {label: "Reasoning", maxLines: 3})
+    // Indicator line must have EXACTLY one `>` prefix and be wrapped in `*` (markdown style)
+    assert.match(rendered, /\n> \*\.\.\. \[\+7 lines of reasoning truncated\]\.\.\.\*\n\n$/)
+})
+
+test("renderReasoning with maxLines equal to line count does not truncate", () => {
+    const text = "Line 1\nLine 2\nLine 3"
+    const rendered = renderReasoning(text, {maxLines: 3})
+    assert.doesNotMatch(rendered, /truncated/)
+})
+
+test("renderReasoning with maxLines greater than line count does not truncate", () => {
+    const text = "Just one line"
+    const rendered = renderReasoning(text, {maxLines: 100})
+    assert.doesNotMatch(rendered, /truncated/)
+})
+
+test("renderReasoning maxLines with 'quote' style uses single blockquote on indicator", () => {
+    const longText = Array.from({length: 10}, (_, i) => `Line ${i + 1}`).join("\n")
+    const rendered = renderReasoning(longText, {style: "quote", maxLines: 3})
+    // quote style does NOT use italics, but MUST have exactly one `>`
+    assert.match(rendered, /\n> \.\.\. \[\+7 lines of reasoning truncated\]\.\.\.\n\n$/)
+    assert.doesNotMatch(rendered, />>/, "no double blockquote under quote style")
 })
 
 // ─── Phase 4 v4: 'quote' render style (clean blockquote, no italics) ─────────
