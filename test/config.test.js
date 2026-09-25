@@ -20,3 +20,8 @@ test("mergeConfig ignores unknown keys (forward-compat)", () => {
     assert.equal(out.label, "X")
     assert.equal(Object.prototype.hasOwnProperty.call(out, "futureOption"), false)
 })
+
+test("mergeConfig accepts 'markdown-rendered' as a valid style (v0.5.0)", () => {
+    const out = mergeConfig({style: "markdown-rendered"})
+    assert.equal(out.style, "markdown-rendered")
+})

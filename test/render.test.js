@@ -400,3 +400,61 @@ test("renderReasoning supports 'compact' style (summary badge with line count)",
     const rendered = renderReasoning(lines, {style: "compact", label: "Thinking"})
     assert.match(rendered, /> ### ── Thinking \(3 lines\) ──/)
 })
+
+// ─── Phase 5 v5: 'markdown-rendered' render style (full inner markdown) ──────
+
+test("renderReasoning markdown-rendered style preserves inner markdown italics", () => {
+    const rendered = renderReasoning("This is *italic* in reasoning", {
+        style: "markdown-rendered",
+        label: "R"
+    })
+    // Header is real `### ── R ──`, NOT `> ### ── R ──`
+    assert.match(rendered, /^### ── R ──\n\n/, "header should be a real header, not blockquote")
+    // Body preserves the literal `*italic*` text (the TUI will render it)
+    assert.match(rendered, /This is \*italic\* in reasoning/)
+    // NO blockquote prefix on any line
+    assert.doesNotMatch(rendered, /^>/m, "no blockquote on body lines")
+})
+
+test("renderReasoning markdown-rendered style preserves inner markdown headers", () => {
+    const reasoning = "Top-level thought.\n\n### Inner header\nMore reasoning."
+    const rendered = renderReasoning(reasoning, {style: "markdown-rendered", label: "R"})
+    assert.match(rendered, /^### ── R ──\n\n/)
+    assert.match(rendered, /\n### Inner header\n/)
+    assert.doesNotMatch(rendered, /^>/m)
+})
+
+test("renderReasoning markdown-rendered style preserves inner numbered lists", () => {
+    const reasoning = "Steps:\n1. First\n2. Second\n3. Third"
+    const rendered = renderReasoning(reasoning, {style: "markdown-rendered", label: "R"})
+    assert.match(rendered, /1\. First/)
+    assert.match(rendered, /2\. Second/)
+    assert.match(rendered, /3\. Third/)
+    // NO asterisk wrapping around list items
+    assert.doesNotMatch(rendered, /\*1\. First\*/)
+    assert.doesNotMatch(rendered, /^>/m)
+})
+
+test("renderReasoning markdown-rendered style preserves code fences verbatim", () => {
+    const reasoning = "Code:\n```js\nconst x = 1\n```\nDone."
+    const rendered = renderReasoning(reasoning, {style: "markdown-rendered", label: "R"})
+    // Fence markers and indented body survive without `> ` prefix or italics wrapping
+    assert.match(rendered, /\n```js\nconst x = 1\n```\n/)
+    assert.doesNotMatch(rendered, /^>/m)
+    assert.doesNotMatch(rendered, /\*```js\*/)
+})
+
+test("renderReasoning markdown-rendered style surfaces metadata badge in header", () => {
+    const rendered = renderReasoning("hello", {
+        style: "markdown-rendered",
+        label: "R",
+        metadata: {durationMs: 1200, tokens: 450}
+    })
+    // Badge lands inside the heading — still NO `> ` prefix
+    assert.match(rendered, /^### ── R \(~1\.2s, 450 tokens\) ──\n\n/)
+    assert.doesNotMatch(rendered, /^>/m)
+})
+
+test("RENDER_STYLES map exposes the new 'markdown-rendered' style", () => {
+    assert.equal(typeof RENDER_STYLES["markdown-rendered"], "function")
+})

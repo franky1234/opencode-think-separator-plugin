@@ -86,7 +86,7 @@ Available knobs:
 | Knob                         | Type      | Default        | Description                                                                                                                                                              |
 | ---------------------------- | --------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `label`                      | `string`  | `"Reasoning"`  | Header label shown above the reasoning block.                                                                                                                            |
-| `style`                      | `string`  | `"markdown"`   | Render strategy. One of `markdown` \| `details` \| `strip` \| `raw` \| `quote` \| `compact`. All six styles are wired through to the OpenCode TUI adapter (v0.4.0+).       |
+| `style`                      | `string`  | `"markdown"`   | Render strategy. One of `markdown` \| `details` \| `strip` \| `raw` \| `quote` \| `compact` \| `markdown-rendered`. All seven styles are wired through to the OpenCode TUI adapter (v0.4.0+).       |
 | `maxLines`                   | `number`  | (unset)        | Optional positive integer. When the reasoning text exceeds `maxLines` lines, the renderer drops the tail and appends a `[+N lines of reasoning truncated]` indicator.    |
 | `models`                     | `object`  | (unset)        | Per-model override map. Each entry maps a model id (exact, or a `prefix/*` wildcard) to `{label?, style?, maxLines?}`. First match wins.                                |
 | `customTags`                 | `string[]`| (unset)        | Extra XML tag names the detector should recognise in addition to its built-in defaults (`think`, `thought`, `thoughts`, `reasoning`, `antThinking`, `thought_process`, `chain_of_thought`, `internal_thought`). |
@@ -96,14 +96,15 @@ Available knobs:
 
 ### Style values and what each one produces
 
-| Value      | Output                                                                                                                                              |
-| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `markdown` | GFM blockquote with italic body and `### ── Label ──` header. Default. (Metadata badge like `(~1.2s, 450 tokens)` is appended to the header when supplied.) |
-| `details`  | HTML `<details><summary>…</summary>…</details>` collapsible block (label + body escaped).                                                          |
-| `strip`    | Drops the reasoning block entirely — the final response stands alone.                                                                                |
-| `raw`      | Pass-through of the raw reasoning text with no decoration.                                                                                         |
-| `quote`    | Same blockquote shape as `markdown` but WITHOUT italic asterisk wrapping — plain `> line` prefix. Useful for terminals that render italic weakly. |
-| `compact`  | One-line header with a `(N lines)` badge + first-line preview, plus a `> *…*` indicator that more lines were elided.                             |
+| Value                | Output                                                                                                                                              |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `markdown`           | GFM blockquote with italic body and `### ── Label ──` header. Default. (Metadata badge like `(~1.2s, 450 tokens)` is appended to the header when supplied.) |
+| `details`            | HTML `<details><summary>…</summary>…</details>` collapsible block (label + body escaped).                                                          |
+| `strip`              | Drops the reasoning block entirely — the final response stands alone.                                                                                |
+| `raw`                | Pass-through of the raw reasoning text with no decoration.                                                                                         |
+| `quote`              | Same blockquote shape as `markdown` but WITHOUT italic asterisk wrapping — plain `> line` prefix. Useful for terminals that render italic weakly. |
+| `compact`            | One-line header with a `(N lines)` badge + first-line preview, plus a `> *…*` indicator that more lines were elided.                             |
+| `markdown-rendered`  | A real `### ── Label ──` heading (no `> ` prefix) followed by the raw reasoning text — the TUI's markdown renderer handles inner formatting (italics, headers, numbered lists, code fences) verbatim. Opt-in alternative to `markdown` when you want inner reasoning structure to actually render. |
 
 Unknown keys in the options are silently ignored (forward-compat). Unknown `style` values silently fall back to `"markdown"`.
 

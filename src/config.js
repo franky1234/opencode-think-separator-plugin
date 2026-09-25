@@ -3,7 +3,7 @@
  *
  * Config knobs in v0.4.0+:
  * - `label`      (header text)
- * - `style`      (render style — `markdown` | `details` | `strip` | `raw` | `quote` | `compact`)
+ * - `style`      (render style — `markdown` | `details` | `strip` | `raw` | `quote` | `compact` | `markdown-rendered`)
  * - `maxLines`   (positive integer; truncates reasoning before rendering)
  * - `models`     (per-model overrides — optional, see `resolveModelConfig`)
  * - `customTags` (extra XML reasoning tags — optional, passed to detector)
@@ -15,14 +15,15 @@
  */
 
 /**
- * @typedef {("markdown"|"details"|"strip"|"raw"|"quote"|"compact")} RenderStyle
+ * @typedef {("markdown"|"details"|"strip"|"raw"|"quote"|"compact"|"markdown-rendered")} RenderStyle
  *   How the reasoning block is rendered before the final response.
- *   - `markdown` (default) — GFM blockquote with italic body + header
- *   - `details`           — HTML `<details>`/`<summary>` collapsible
- *   - `strip`             — drops the reasoning block entirely (renders as empty string)
- *   - `raw`               — pass-through of the raw reasoning text, no decoration
- *   - `quote`             — clean blockquote (same shape as `markdown`, NO italic wrapping)
- *   - `compact`           — one-line header with line-count badge + first-line preview
+ *   - `markdown` (default)  — GFM blockquote with italic body + header
+ *   - `details`              — HTML `<details>`/`<summary>` collapsible
+ *   - `strip`                — drops the reasoning block entirely (renders as empty string)
+ *   - `raw`                  — pass-through of the raw reasoning text, no decoration
+ *   - `quote`                — clean blockquote (same shape as `markdown`, NO italic wrapping)
+ *   - `compact`              — one-line header with line-count badge + first-line preview
+ *   - `markdown-rendered`    — real `### ── Label ──` header (no `> ` prefix) + raw body, so the TUI's markdown renderer handles inner formatting (italics, headers, lists, code fences) verbatim
  */
 
 /**
@@ -86,7 +87,15 @@
  * not in this set is treated as an unknown key and falls back to the default.
  * @type {ReadonlyArray<RenderStyle>}
  */
-const ALLOWED_STYLES = Object.freeze(["markdown", "details", "strip", "raw", "quote", "compact"])
+const ALLOWED_STYLES = Object.freeze([
+    "markdown",
+    "details",
+    "strip",
+    "raw",
+    "quote",
+    "compact",
+    "markdown-rendered"
+])
 
 /**
  * Module-private default for `maxLines`. There is no built-in ceiling — users

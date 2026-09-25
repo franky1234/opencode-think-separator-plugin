@@ -156,16 +156,17 @@ The fixtures are real provider captures (validated against live API responses, s
 
 ## 3. Render pipeline
 
-The v0.4.0 renderer exposes **six styles** through the strategy map `RENDER_STYLES` in `src/render.js`:
+The v0.4.0 renderer exposes **seven styles** through the strategy map `RENDER_STYLES` in `src/render.js`:
 
-| Style       | Header                                                           | Body                                              | Notes                                                                                  |
-| ----------- | ---------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `markdown`  | `> ### ── Label ──`                                              | `> *line*` italic blockquote                      | Default; preserves code fences, indentation, list syntax verbatim.                     |
-| `details`   | `<details><summary>Label</summary>`                              | HTML-escaped body                                 | Best for web / non-TUI consumers; collapses by default.                                |
-| `strip`     | (none)                                                           | (none)                                            | Drops reasoning entirely — final response stands alone.                                |
-| `raw`       | (none)                                                           | Reasoning text unchanged                          | Pass-through.                                                                          |
-| `quote`     | `> ### ── Label ──`                                              | `> line` plain blockquote (no italics)            | Useful for terminals that render italic weakly. Same code-fence / list preservation.   |
-| `compact`   | `> ### ── Label (N lines) ──`                                    | `> *first line preview*` + `> *…*`                | One-line summary with line-count badge for small terminals / long reasoning traces.    |
+| Style                 | Header                                                           | Body                                              | Notes                                                                                  |
+| --------------------- | ---------------------------------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `markdown`            | `> ### ── Label ──`                                              | `> *line*` italic blockquote                      | Default; preserves code fences, indentation, list syntax verbatim.                     |
+| `details`             | `<details><summary>Label</summary>`                              | HTML-escaped body                                 | Best for web / non-TUI consumers; collapses by default.                                |
+| `strip`               | (none)                                                           | (none)                                            | Drops reasoning entirely — final response stands alone.                                |
+| `raw`                 | (none)                                                           | Reasoning text unchanged                          | Pass-through.                                                                          |
+| `quote`               | `> ### ── Label ──`                                              | `> line` plain blockquote (no italics)            | Useful for terminals that render italic weakly. Same code-fence / list preservation.   |
+| `compact`             | `> ### ── Label (N lines) ──`                                    | `> *first line preview*` + `> *…*`                | One-line summary with line-count badge for small terminals / long reasoning traces.    |
+| `markdown-rendered`   | `### ── Label ──`                                                | Raw reasoning text (full markdown rendered)       | New in v0.5.0. Opt-in for users who want inner markdown (italics, headers, lists) rendered inside the reasoning block. |
 
 ### `maxLines` truncation
 

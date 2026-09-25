@@ -21,6 +21,10 @@
  *   plain `> ${line}` blockquote. Useful for terminals that render italic weakly.
  * - `compact`: One-line header with line-count badge + first-line preview
  *   (plus a `*...*` indicator that more lines were elided).
+ * - `markdown-rendered`: A real `### ── Label ──` heading (no `> ` prefix)
+ *   followed by the raw reasoning text — the TUI's markdown renderer handles
+ *   inner formatting (italics, headers, numbered lists, code fences) verbatim.
+ *   Opt-in alternative to `markdown` when inner reasoning structure should render.
  */
 export type RenderStyle =
     | "markdown"
@@ -28,19 +32,21 @@ export type RenderStyle =
     | "strip"
     | "raw"
     | "quote"
-    | "compact";
+    | "compact"
+    | "markdown-rendered";
 
 /**
  * Options accepted by `renderReasoning` (and related render functions) when
  * callers want to override the plugin-level config (label, style, metadata).
  *
  * `metadata` is forwarded to the renderer so the header can show a duration
- * / token badge. Only the `markdown` renderer currently surfaces it.
+ * / token badge. Only the `markdown` and `markdown-rendered` renderers
+ * currently surface it.
  */
 export interface RenderOptions {
     /** Header label shown above the reasoning block. */
     label?: string;
-    /** Rendering strategy to apply. */
+    /** Rendering strategy to apply. See `RenderStyle` for the allowed set; the `markdown-rendered` value (v0.5.0+) preserves inner markdown rendering instead of blockquoting it. */
     style?: RenderStyle;
     /**
      * Optional reasoning metadata for header badges (e.g. duration, tokens).

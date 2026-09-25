@@ -1,13 +1,14 @@
 /**
  * Strategy-Pattern renderer for reasoning + response blocks.
  *
- * Six render styles are exposed via the frozen `RENDER_STYLES` map:
- * - `markdown` (default; preserved from v0.x) — GFM blockquote with header + italic body
- * - `details`                                — HTML `<details>`/`<summary>` collapsible (HTML-escaped)
- * - `strip`                                  — drops the reasoning block entirely (renders as empty string)
- * - `raw`                                    — pass-through of the raw reasoning text, no decoration
- * - `quote`                                  — clean blockquote (same shape as `markdown`, NO italic wrapping)
- * - `compact`                                — one-line header with line-count badge + first-line preview
+ * Seven render styles are exposed via the frozen `RENDER_STYLES` map:
+ * - `markdown`            (default; preserved from v0.x) — GFM blockquote with header + italic body
+ * - `details`                                        — HTML `<details>`/`<summary>` collapsible (HTML-escaped)
+ * - `strip`                                          — drops the reasoning block entirely (renders as empty string)
+ * - `raw`                                            — pass-through of the raw reasoning text, no decoration
+ * - `quote`                                          — clean blockquote (same shape as `markdown`, NO italic wrapping)
+ * - `compact`                                        — one-line header with line-count badge + first-line preview
+ * - `markdown-rendered`                              — real `### ── Label ──` header (no `> ` prefix) + raw body, so the TUI's markdown renderer handles inner formatting (italics, headers, lists) verbatim
  *
  * Public API is backward compatible: `renderReasoning(text, stringLabel)` still
  * produces the same markdown output as v0.2.0.
@@ -415,6 +416,68 @@ function renderCompact(reasoningText, label, _metadata) {
 }
 
 /**
+ * Build the header line for the `markdown-rendered` style. Mirror of
+ * `formatHeader` that OMITS the `> ` blockquote prefix, so the header renders
+ * as a real `###` heading inside the reasoning block. Badge composition
+ * (durationMs / tokens) is identical to `formatHeader`.
+ *
+ * Intentionally a separate helper rather than a parameter on `formatHeader`:
+ * the `markdown` style's output is byte-frozen for back-compat, so adding
+ * a `blockquote` flag to `formatHeader` would risk regressions in the 161
+ * existing tests that pin its exact shape.
+ *
+ * @param {string} label - Section label.
+ * @param {{durationMs?: number, tokens?: number, budget?: number}} [metadata]
+ * @returns {string} `### ── ${label} ──` or `### ── ${label} (${badge}) ──`.
+ */
+function formatMarkdownRenderedHeader(label, metadata) {
+    const dur = formatDuration(metadata?.durationMs)
+    const tok = formatTokens(metadata?.tokens)
+    const parts = [dur, tok].filter((p) => p.length > 0)
+    if (parts.length === 0) {
+        return `### ── ${label} ──`
+    }
+    return `### ── ${label} (${parts.join(", ")}) ──`
+}
+
+/**
+ * Render reasoning text with full inner markdown rendering intact — NO
+ * `> ` blockquote wrapping, NO `*…*` italic wrapping on paragraph lines.
+ * The header is a real `### ── Label ──` heading (without the `> ` prefix)
+ * so the TUI renders it as a heading inside the reasoning block, and the
+ * body is the raw reasoning text so its own markdown (italics, headers,
+ * numbered lists, code fences, blockquotes) survives intact for the TUI's
+ * markdown renderer to handle.
+ *
+ * Intended as the opt-in alternative to the default `markdown` style: the
+ * default prioritises a "secondary content" blockquote feel, but a user
+ * who wants the model's inner formatting (e.g. structured lists, italicised
+ * keywords, sub-headers) to actually render must switch to this style.
+ *
+ * Code fences, indentation, and list syntax are preserved verbatim by
+ * construction (there is no `> ` wrap or italics wrap to fight). The
+ * trailing `\n\n` separator is preserved so concatenating with the
+ * response block still produces a single blank-line separator — this
+ * matches the byte-shape convention of every other style.
+ *
+ * `metadata` is honoured via `formatMarkdownRenderedHeader` so the
+ * `(duration, tokens)` badge still appears in the header when supplied.
+ *
+ * @param {string} reasoningText - Raw reasoning text (may contain newlines).
+ * @param {string|undefined} label - Header label; falls back to "Reasoning".
+ * @param {{durationMs?: number, tokens?: number, budget?: number}} [metadata]
+ *   Optional reasoning metadata for the header badge.
+ * @returns {string} Reasoning block ending with `\n\n`.
+ */
+function renderMarkdownRendered(reasoningText, label, metadata) {
+    const safeLabel = typeof label === "string" && label.length > 0 ? label : "Reasoning"
+    const header = formatMarkdownRenderedHeader(safeLabel, metadata)
+    // Body is the raw reasoning text — no `> ` wrapping, no `*…*` italics wrapping.
+    // Code fences, lists, headers, and paragraphs all render as-is in the TUI.
+    return `${header}\n\n${reasoningText}\n\n`
+}
+
+/**
  * Strategy map: style name → render function. Frozen so consumers cannot
  * accidentally mutate the dispatch table at runtime.
  * @type {Readonly<Record<string, (reasoningText: string, label?: string, metadata?: object) => string>>}
@@ -425,7 +488,8 @@ export const RENDER_STYLES = Object.freeze({
     strip: renderStrip,
     raw: renderRaw,
     quote: renderQuote,
-    compact: renderCompact
+    compact: renderCompact,
+    "markdown-rendered": renderMarkdownRendered
 })
 
 /**
