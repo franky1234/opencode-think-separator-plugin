@@ -4,7 +4,6 @@ export default {
     printWidth: 100,
     semi: false,
     singleQuote: false,
-    jsxBracketSameLine: true,
     bracketSpacing: false,
     arrowParens: "always",
     endOfLine: "lf"
