@@ -458,3 +458,11 @@ test("renderReasoning markdown-rendered style surfaces metadata badge in header"
 test("RENDER_STYLES map exposes the new 'markdown-rendered' style", () => {
     assert.equal(typeof RENDER_STYLES["markdown-rendered"], "function")
 })
+
+test("renderMarkdownBody emits consistent blank-line format inside and outside code fence", () => {
+    const reasoning = "before\n\n```\ncode line\n```\n\nafter"
+    const rendered = renderReasoning(reasoning, "R")
+    // Both blank-line contexts produce `>` without trailing space
+    assert.match(rendered, />\n/) // blank line as blockquote
+    assert.doesNotMatch(rendered, /> \n/) // NOT trailing space
+})

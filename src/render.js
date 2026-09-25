@@ -167,7 +167,7 @@ function formatLinesAsBlockquote(lines, {italicParagraphs = false} = {}) {
             continue
         }
         if (inCodeFence) {
-            out.push(`> ${rawLine}`)
+            out.push(trimmed.length === 0 ? ">" : `> ${rawLine}`)
             continue
         }
         if (trimmed.length === 0) {
@@ -189,7 +189,7 @@ function formatLinesAsBlockquote(lines, {italicParagraphs = false} = {}) {
  * `~~~`) are wrapped as `> ${line}` with their original leading whitespace
  * so indentation survives. Markdown list items are also passed through
  * verbatim to keep the list marker at column 0 of the quoted content.
- * Paragraph lines keep the legacy `> *${line.trim()}*` italic styling.
+ * Paragraph lines keep the legacy `> *${line}*` italic styling.
  *
  * @param {string} reasoningText - Raw reasoning text (may contain newlines).
  * @returns {string} The body block (no header, no trailing blank-line separator).
@@ -295,7 +295,7 @@ function normalizeOptions(optionsOrLabel) {
  * Backward-compatible equivalent of the v0.2.0 `renderReasoning` body for
  * paragraph-only reasoning. Since v0.4.0 the body is produced by
  * `renderMarkdownBody`, which preserves code fences, indentation, and list
- * syntax. Paragraph lines still render as `> *${line.trim()}*`, byte-identical
+ * syntax. Paragraph lines still render as `> *${line}*`, byte-identical
  * to v0.2.0 and v0.3.0.
  *
  * When `metadata` is supplied, a `(...)` badge is appended to the header.
