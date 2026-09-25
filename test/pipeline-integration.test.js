@@ -199,6 +199,21 @@ test("pipeline: ThinkSeparator factory tolerates completely missing msg.info", a
     assert.match(msg.parts[0].text, /── Thinking ──/)
 })
 
+test("pipeline: transformMessage unifies multiple reasoning blocks under a single header", () => {
+    const msg = {
+        parts: [
+            {type: "text", text: "<think>part one</think> Middle text. <think>part two</think> End."}
+        ]
+    }
+    transformMessage(msg)
+    const textPart = msg.parts[0].text
+    const headerMatches = textPart.match(/> ### ── Reasoning ──/g)
+    assert.strictEqual(headerMatches?.length, 1, "Should only have one reasoning header")
+    assert.match(textPart, /part one/)
+    assert.match(textPart, /part two/)
+    assert.match(textPart, /Middle text\. {1,2}End\./)
+})
+
 test("pipeline: ThinkSeparator factory propagates customTags to the detector", async () => {
     const factory = await ThinkSeparator(undefined, {
         customTags: ["custom_reasoning"]

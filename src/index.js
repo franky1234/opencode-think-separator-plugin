@@ -180,9 +180,12 @@ function resolveFallbackReasoning(cleanParts, msg, existingReasoningCount, custo
  * @param {{durationMs?: number, budget?: number, tokens?: number}|undefined} metadata
  */
 function injectReasoningBlock(cleanParts, reasoningTexts, label, style, metadata) {
-    const reasoningBlock = reasoningTexts
-        .map((t) => renderReasoning(t, {label, style, metadata}))
-        .join("\n")
+    if (reasoningTexts.length === 0) return
+    // Join multiple reasoning blocks with a clean blank-line separator so the
+    // renderer produces a single header and the bodies render as continuous
+    // blockquoted content under it (no duplicate `### ── Reasoning ──` lines).
+    const combinedReasoning = reasoningTexts.join("\n\n")
+    const reasoningBlock = renderReasoning(combinedReasoning, {label, style, metadata})
 
     const firstTextIndex = cleanParts.findIndex((p) => p && p.type === "text")
     if (firstTextIndex !== -1) {
