@@ -24,6 +24,8 @@
  * and then re-exporting here.
  */
 
+import {createReasoningStreamParser as _createReasoningStreamParser} from "./stream.js"
+
 /**
  * Extracts reasoning blocks found inside XML-like tags (e.g. <think>...</think>)
  * from a text string. Handles closed tags, unclosed tags at the end of text,
@@ -143,19 +145,6 @@ export {formatDuration} from "./render.js"
 export {formatTokens} from "./render.js"
 
 /**
- * Cached reference to `createReasoningStreamParser` from `./stream.js`.
- *
- * `./stream.js` will be introduced in Phase 4 (Task 4) of the v2 upgrade
- * with the streaming chunk parser FSM. Until that file exists, importing
- * it eagerly would throw `ERR_MODULE_NOT_FOUND` at load time. The dynamic
- * import inside `createReasoningStreamParser` (below) defers resolution
- * to first call and caches the resolved factory here.
- *
- * @type {((options?: Record<string, unknown>) => import("../types/index.js").ReasoningStreamParser) | null}
- */
-let _createReasoningStreamParser = null
-
-/**
  * Factory for the streaming chunk parser (Phase 4 / Task 4 of v2).
  *
  * Each invocation returns a fresh, isolated finite-state-machine instance
@@ -163,26 +152,17 @@ let _createReasoningStreamParser = null
  * use with SSE, WebSocket, and Vercel AI SDK streams where chunks may
  * split a tag like `<think>` between two payloads.
  *
- * Implementation note: this wrapper exists because `./stream.js` is added
- * in a later phase of the v2 upgrade. The first call performs a one-time
- * dynamic `import("./stream.js")` and caches the resolved factory;
- * subsequent calls reuse the cached reference.
+ * Implementation note: the factory itself in `./stream.js` is sync; this
+ * wrapper is kept `async` so the public `core` surface preserves its
+ * `Promise<ReasoningStreamParser>` signature. Callers should still `await`
+ * the result (the await is a microtask hop, not a real load-time cost).
+ *
+ * Re-exported from `./stream.js`. See that module for full contract.
  *
  * @param {Record<string, unknown>} [options] - Optional factory options
  *   (final shape is defined in `./stream.js`).
  * @returns {Promise<import("../types/index.js").ReasoningStreamParser>} A fresh parser instance.
- * @throws {Error} If `./stream.js` is not yet available on disk (Phase 4 not merged).
  */
 export async function createReasoningStreamParser(options) {
-    if (_createReasoningStreamParser === null) {
-        // Lazy dynamic import resolved once and cached. `./stream.js` is
-        // introduced in Phase 4 (Task 4) of the v2 upgrade.
-        const mod = await import("./stream.js")
-        _createReasoningStreamParser = mod.createReasoningStreamParser
-    }
-    const factory =
-        /** @type {(options?: Record<string, unknown>) => import("../types/index.js").ReasoningStreamParser} */ (
-            _createReasoningStreamParser
-        )
-    return factory(options)
+    return _createReasoningStreamParser(options)
 }
