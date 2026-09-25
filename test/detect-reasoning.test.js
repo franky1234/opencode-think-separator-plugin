@@ -265,3 +265,29 @@ test("detectReasoning(text-tag) carries metadata from the same message", () => {
     assert.ok(r.metadata)
     assert.equal(r.metadata.durationMs, 999)
 })
+
+test("extractReasoningFromText ignores <think> tags inside fenced code blocks", () => {
+    const text =
+        "Here is how to use it:\n```xml\n<think>do not extract this</think>\n```\n<think>real reasoning</think>\nFinal answer."
+    const result = extractReasoningFromText(text)
+    assert.deepStrictEqual(result.reasoningTexts, ["real reasoning"])
+    assert.match(result.cleanText, /```xml\n<think>do not extract this<\/think>\n```/)
+    assert.match(result.cleanText, /Final answer\./)
+})
+
+test("extractReasoningFromText ignores <think> tags inside inline code spans", () => {
+    const text = "Mentioning `<think>test</think>` in text. <think>actual thought</think> Result."
+    const result = extractReasoningFromText(text)
+    assert.deepStrictEqual(result.reasoningTexts, ["actual thought"])
+    assert.match(result.cleanText, /Mentioning `<think>test<\/think>` in text\./)
+})
+
+test("extractReasoningFromText does not treat mid-sentence <think> as an unclosed reasoning block", () => {
+    const text = "Note: <think> tags are used for reasoning. The answer is 42."
+    const result = extractReasoningFromText(text)
+    assert.deepStrictEqual(result.reasoningTexts, [])
+    assert.strictEqual(
+        result.cleanText,
+        "Note: <think> tags are used for reasoning. The answer is 42."
+    )
+})

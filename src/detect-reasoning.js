@@ -68,10 +68,16 @@ export function compileReasoningTagRegex(tags) {
     // Phase 1: Closed tags with optional whitespace inside tag
     const compiled = Object.freeze({
         CLOSED: new RegExp(`<\\s*(${patternStr})\\b[^>]*>([\\s\\S]*?)<\\s*\\/\\s*\\1\\s*>`, "gi"),
-        // Phase 2: Unclosed tags extending to the end of string
-        UNCLOSED: new RegExp(`<\\s*(${patternStr})\\b[^>]*>([\\s\\S]*)$`, "gi"),
-        // Phase 3: Any orphan opening or closing tags
-        ORPHAN: new RegExp(`<\\s*\\/?\\s*(${patternStr})\\b[^>]*>`, "gi")
+        // Phase 2: Unclosed tags at the start of string OR after a newline (with
+        // optional indentation). This prevents mid-sentence mentions of `<think>`
+        // (e.g. "Note: <think> tags are used for reasoning.") from being matched
+        // as live reasoning blocks.
+        UNCLOSED: new RegExp(`(?:^|\\n)\\s*<(${patternStr})\\b[^>]*>([\\s\\S]*)$`, "gi"),
+        // Phase 3: Any orphan opening or closing tags at the start of string OR
+        // after a newline. Mirrors UNCLOSED's anchor so mid-sentence literal
+        // markup (documentation, examples) is preserved verbatim rather than
+        // being silently stripped.
+        ORPHAN: new RegExp(`(?:^|\\n)\\s*<\\s*\\/?\\s*(${patternStr})\\b[^>]*>`, "gi")
     })
     cache.set(tags, compiled)
     return compiled
@@ -149,12 +155,102 @@ function resolveTags(tags) {
 }
 
 /**
+ * Sentinel prefix used to swap fenced / inline code spans out of the input
+ * before reasoning-tag extraction. Null bytes guarantee no collision with
+ * valid text and make the sentinel trivially distinguishable from any
+ * literal substring the user might supply.
+ */
+const CODE_BLOCK_SENTINEL_PREFIX = "\x00__CODE_BLOCK_"
+const CODE_BLOCK_SENTINEL_SUFFIX = "__\x00"
+
+/**
+ * Sentinel regexes used to mask code spans before reasoning-tag extraction.
+ * Module-private — only `maskCodeSpans` constructs the sentinel Map.
+ */
+const FENCED_CODE_REGEX = /(^|\n)(```|~~~)[^\n]*\n[\s\S]*?\n\2(\n|$)/g
+const INLINE_CODE_REGEX = /`[^`\n]+`/g
+
+/**
+ * Swaps every fenced code block and inline code span in `text` for a
+ * unique sentinel placeholder, returning the masked string and a Map of
+ * sentinel → original snippet. The regexes never see anything inside a
+ * code span, so any `<think>` style marker that appears as documentation,
+ * example, or literal markup is invisible to the reasoning extractor.
+ *
+ * Fenced blocks are matched first so that backticks appearing inside a
+ * fenced block are not mis-classified as inline-code openers. The
+ * `[^`\n]+` body of an inline span also cannot span a newline, so a
+ * fenced block's trailing newline correctly closes the inline span.
+ *
+ * The sentinels are emitted in encounter order; the Map is the single
+ * source of truth used by `restoreCodeSpans` to swap the literals back
+ * into both the cleaned text and (defensively) any reasoning text that
+ * happened to capture a sentinel.
+ *
+ * @param {string} text
+ * @returns {{ masked: string, originals: Map<string, string> }}
+ */
+function maskCodeSpans(text) {
+    /** @type {Map<string, string>} */
+    const originals = new Map()
+    let counter = 0
+
+    const masked = text
+        .replace(FENCED_CODE_REGEX, (match) => {
+            const sentinel = CODE_BLOCK_SENTINEL_PREFIX + counter + CODE_BLOCK_SENTINEL_SUFFIX
+            originals.set(sentinel, match)
+            counter++
+            return sentinel
+        })
+        .replace(INLINE_CODE_REGEX, (match) => {
+            const sentinel = CODE_BLOCK_SENTINEL_PREFIX + counter + CODE_BLOCK_SENTINEL_SUFFIX
+            originals.set(sentinel, match)
+            counter++
+            return sentinel
+        })
+
+    return {masked, originals}
+}
+
+/**
+ * Swaps sentinel placeholders back into the original code-span literals.
+ * Iterates in insertion order so later placeholders are not disturbed by
+ * earlier replacements (the sentinels contain `__N__` numeric suffixes
+ * that cannot collide, but iteration order is the contract callers rely
+ * on when reasoning about the Map).
+ *
+ * Applied to both `cleanText` and each `reasoningText` so any sentinel
+ * that slipped through the masking pass is restored consistently.
+ *
+ * @param {string} input
+ * @param {Map<string, string>} originals
+ * @returns {string}
+ */
+function restoreCodeSpans(input, originals) {
+    let out = input
+    for (const [sentinel, original] of originals) {
+        if (out.includes(sentinel)) {
+            out = out.split(sentinel).join(original)
+        }
+    }
+    return out
+}
+
+/**
  * Extracts reasoning blocks found inside XML-like tags (e.g. <think>...</think>)
  * from a text string. Handles closed tags and unclosed tags at the end of text.
  *
  * Implemented as a 3-phase linear pipeline (closed → unclosed → orphan sanitization).
  * Keeping the phases inline keeps each `.replace()` callback local and avoids an
  * accumulator threading pattern that would add ceremony without clarity.
+ *
+ * Before any reasoning regex runs, fenced code blocks and inline code spans
+ * are swapped out for unique sentinels (`maskCodeSpans`). This prevents
+ * documentation-style or example-style mentions of `<think>` (e.g. inside a
+ * markdown code block teaching the user about the plugin) from being
+ * extracted as live reasoning. After stripping, the sentinels are restored
+ * so the cleaned text and any extracted reasoning text preserve the
+ * original code spans byte-for-byte.
  *
  * When `tags` is omitted (or not a non-empty array of strings), the built-in
  * `REASONING_TAG_NAMES` whitelist is used — preserving v0.2.0 behaviour byte
@@ -173,11 +269,12 @@ export function extractReasoningFromText(text, tags) {
     const effectiveTags = resolveTags(tags)
     const {CLOSED, UNCLOSED, ORPHAN} = compileReasoningTagRegex(effectiveTags)
 
+    const {masked, originals} = maskCodeSpans(text)
     /** @type {string[]} */
     const reasoningTexts = []
 
     // 1. Extract and remove closed tags first
-    let remaining = text.replace(CLOSED, (match, tagName, content) => {
+    let remaining = masked.replace(CLOSED, (match, tagName, content) => {
         const trimmed = content.trim()
         if (trimmed.length > 0) {
             reasoningTexts.push(trimmed)
@@ -185,7 +282,9 @@ export function extractReasoningFromText(text, tags) {
         return ""
     })
 
-    // 2. Extract and remove any remaining unclosed tags (e.g. <think>... at end of string)
+    // 2. Extract and remove any remaining unclosed tags (e.g. <think>... at end of string).
+    //    The regex requires the tag to appear at start-of-string or after a newline with
+    //    optional indentation, so mid-sentence mentions of <think> are ignored.
     remaining = remaining.replace(UNCLOSED, (match, tagName, content) => {
         const trimmed = content.trim()
         if (trimmed.length > 0) {
@@ -195,7 +294,16 @@ export function extractReasoningFromText(text, tags) {
     })
 
     // 3. Remove any remaining orphan opening/closing tags
-    const cleanText = remaining.replace(ORPHAN, "").trim()
+    let cleanText = remaining.replace(ORPHAN, "").trim()
+
+    // 4. Restore original code-span literals in both outputs so masked placeholders
+    //    are transparent to downstream consumers.
+    if (originals.size > 0) {
+        cleanText = restoreCodeSpans(cleanText, originals)
+        for (let i = 0; i < reasoningTexts.length; i++) {
+            reasoningTexts[i] = restoreCodeSpans(reasoningTexts[i], originals)
+        }
+    }
 
     return {reasoningTexts, cleanText}
 }
