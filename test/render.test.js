@@ -109,6 +109,11 @@ test("RENDER_STYLES map exposes all four styles", () => {
     assert.equal(typeof RENDER_STYLES.raw, "function")
 })
 
+test("RENDER_STYLES map exposes the new 'quote' and 'compact' styles", () => {
+    assert.equal(typeof RENDER_STYLES.quote, "function")
+    assert.equal(typeof RENDER_STYLES.compact, "function")
+})
+
 test("RENDER_STYLES map is frozen", () => {
     assert.ok(Object.isFrozen(RENDER_STYLES), "RENDER_STYLES must be frozen")
 })
@@ -340,4 +345,31 @@ test("renderReasoning preserves ordered markdown lists inside reasoning", () => 
     assert.match(rendered, /> 1\. First/)
     assert.match(rendered, /> 2\. Second/)
     assert.doesNotMatch(rendered, /> \*1\. First\*/)
+})
+
+// ─── Phase 4 v4: maxLines truncation ─────────────────────────────────────────
+
+test("renderReasoning truncates when lines exceed maxLines", () => {
+    const longText = Array.from({length: 20}, (_, i) => `Line ${i + 1}`).join("\n")
+    const rendered = renderReasoning(longText, {label: "Reasoning", maxLines: 5})
+    assert.match(rendered, /Line 1/)
+    assert.match(rendered, /Line 5/)
+    assert.doesNotMatch(rendered, /Line 6/)
+    assert.match(rendered, /\[\+15 lines of reasoning truncated\]/)
+})
+
+// ─── Phase 4 v4: 'quote' render style (clean blockquote, no italics) ─────────
+
+test("renderReasoning supports 'quote' style without italics", () => {
+    const rendered = renderReasoning("Clean thought line", {style: "quote"})
+    assert.match(rendered, /> Clean thought line/)
+    assert.doesNotMatch(rendered, /> \*Clean thought line\*/)
+})
+
+// ─── Phase 4 v4: 'compact' render style (summary badge + line count) ─────────
+
+test("renderReasoning supports 'compact' style (summary badge with line count)", () => {
+    const lines = "Thought line 1\nThought line 2\nThought line 3"
+    const rendered = renderReasoning(lines, {style: "compact", label: "Thinking"})
+    assert.match(rendered, /> ### ── Thinking \(3 lines\) ──/)
 })

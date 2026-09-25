@@ -17,8 +17,18 @@
  * - `details`: HTML `<details><summary>` collapsible block.
  * - `strip`: Removes reasoning entirely; the final response stands alone.
  * - `raw`: Returns the reasoning text unmodified.
+ * - `quote`: Same shape as `markdown` but WITHOUT italic asterisk wrapping —
+ *   plain `> ${line}` blockquote. Useful for terminals that render italic weakly.
+ * - `compact`: One-line header with line-count badge + first-line preview
+ *   (plus a `*...*` indicator that more lines were elided).
  */
-export type RenderStyle = "markdown" | "details" | "strip" | "raw";
+export type RenderStyle =
+    | "markdown"
+    | "details"
+    | "strip"
+    | "raw"
+    | "quote"
+    | "compact";
 
 /**
  * Options accepted by `renderReasoning` (and related render functions) when
@@ -38,6 +48,13 @@ export interface RenderOptions {
      * badge from it. All fields are optional and silently ignored if absent.
      */
     metadata?: ReasoningMetadata;
+    /**
+     * Optional maximum number of lines to retain before rendering. When the
+     * input has more lines, the renderer drops the tail and appends an italic
+     * elision indicator. Must be a positive integer; non-positive / non-integer
+     * values are silently ignored. Applies to every render style.
+     */
+    maxLines?: number;
 }
 
 /**
@@ -90,18 +107,21 @@ export interface OpenCodeMessage {
 }
 
 /**
- * Per-model override payload. Both fields are optional; an absent field
+ * Per-model override payload. All fields are optional; an absent field
  * falls back to the value inherited from the base config when resolved via
  * `resolveModelConfig`.
  *
  * - `style`: render-style override (validated against `RenderStyle`).
  * - `label`: header-label override (any non-empty string is accepted).
+ * - `maxLines`: per-model truncation limit override (must be a positive integer).
  */
 export interface ModelConfigOverride {
     /** Render-style override applied when the model pattern matches. */
     style?: RenderStyle;
     /** Header-label override applied when the model pattern matches. */
     label?: string;
+    /** Per-model maxLines override; must be a positive integer to take effect. */
+    maxLines?: number;
 }
 
 /**
@@ -132,14 +152,20 @@ export type ModelConfigMap = Readonly<Record<string, ModelConfigOverride>>;
  * Frozen plugin configuration after `mergeConfig` resolves user overrides.
  * Returned as a fresh shallow copy on every call.
  *
- * `models` and `customTags` are OMITTED when the user did not supply them —
- * this keeps `mergeConfig({})` deepEqual to `defaultConfig` for back-compat.
+ * `models`, `customTags`, and `maxLines` are OMITTED when the user did not
+ * supply a valid value for them — this keeps `mergeConfig({})` deepEqual to
+ * `defaultConfig` for back-compat.
  */
 export interface PluginConfig {
     /** Header label shown above the reasoning block. */
     label: string;
     /** Render strategy applied to extracted reasoning (see `RenderStyle`). */
     style: RenderStyle;
+    /**
+     * Maximum number of lines to retain before rendering. Present only when
+     * the user supplied a positive integer. Absent means "no truncation".
+     */
+    maxLines?: number;
     /**
      * Per-model override map. Present only when the user supplied a
      * non-empty `models` object. Empty maps are dropped silently.
@@ -168,6 +194,12 @@ export interface UserConfig {
      * allowed set. Values are case-sensitive.
      */
     style?: RenderStyle;
+    /**
+     * Optional maximum number of lines to retain before rendering. Must be
+     * a positive integer; any other shape (zero, negative, float, NaN, string)
+     * is silently dropped by `mergeConfig`. Forwarded to every render style.
+     */
+    maxLines?: number;
     /**
      * Optional per-model override map. Must be a plain object; non-objects
      * (including strings, arrays, null) are silently dropped by `mergeConfig`.

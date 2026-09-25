@@ -89,3 +89,47 @@ test("frozen defaultConfig is not mutated by mergeConfig calls that include mode
     assert.equal(Object.prototype.hasOwnProperty.call(defaultConfig, "models"), false)
     assert.equal(Object.prototype.hasOwnProperty.call(defaultConfig, "customTags"), false)
 })
+
+// ─── Phase 4 v4: maxLines config + per-model override ────────────────────────
+
+test("mergeConfig({maxLines: 10}) stores a positive integer maxLines", () => {
+    const out = mergeConfig({maxLines: 10})
+    assert.equal(out.maxLines, 10)
+})
+
+test("mergeConfig silently drops invalid maxLines values", () => {
+    assert.equal(mergeConfig({maxLines: 0}).maxLines, undefined, "zero")
+    assert.equal(mergeConfig({maxLines: -5}).maxLines, undefined, "negative")
+    assert.equal(mergeConfig({maxLines: 1.5}).maxLines, undefined, "float")
+    assert.equal(mergeConfig({maxLines: "10"}).maxLines, undefined, "string")
+    assert.equal(mergeConfig({maxLines: null}).maxLines, undefined, "null")
+    assert.equal(mergeConfig({maxLines: Number.NaN}).maxLines, undefined, "NaN")
+})
+
+test("mergeConfig with no maxLines returns object without the field (back-compat)", () => {
+    const out = mergeConfig({label: "X"})
+    assert.equal(out.label, "X")
+    assert.equal(Object.prototype.hasOwnProperty.call(out, "maxLines"), false)
+})
+
+test("resolveModelConfig forwards maxLines override when valid", () => {
+    const base = mergeConfig({maxLines: 20})
+    const resolved = resolveModelConfig(
+        "deepseek/v4-pro",
+        mergeConfig({models: {"deepseek/*": {maxLines: 5}}})
+    )
+    // pure override with no base maxLines — effective maxLines is 5
+    assert.equal(resolved.maxLines, 5)
+    assert.equal(resolved.label, "Reasoning")
+    // sanity-check the base-with-maxLines path
+    assert.equal(base.maxLines, 20)
+})
+
+test("resolveModelConfig falls back to baseConfig.maxLines when override is invalid", () => {
+    const merged = mergeConfig({
+        maxLines: 20,
+        models: {"deepseek/*": {maxLines: -1}}
+    })
+    const resolved = resolveModelConfig("deepseek/v4-pro", merged)
+    assert.equal(resolved.maxLines, 20, "invalid override keeps base maxLines")
+})

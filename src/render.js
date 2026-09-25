@@ -1,11 +1,13 @@
 /**
  * Strategy-Pattern renderer for reasoning + response blocks.
  *
- * Four render styles are exposed via the frozen `RENDER_STYLES` map:
- * - `markdown` — GFM blockquote with header + italic body (default; preserved from v0.x)
- * - `details`  — HTML `<details>`/`<summary>` collapsible (HTML-escaped)
- * - `strip`    — drops the reasoning block entirely (renders as empty string)
- * - `raw`      — pass-through of the raw reasoning text, no decoration
+ * Six render styles are exposed via the frozen `RENDER_STYLES` map:
+ * - `markdown` (default; preserved from v0.x) — GFM blockquote with header + italic body
+ * - `details`                                — HTML `<details>`/`<summary>` collapsible (HTML-escaped)
+ * - `strip`                                  — drops the reasoning block entirely (renders as empty string)
+ * - `raw`                                    — pass-through of the raw reasoning text, no decoration
+ * - `quote`                                  — clean blockquote (same shape as `markdown`, NO italic wrapping)
+ * - `compact`                                — one-line header with line-count badge + first-line preview
  *
  * Public API is backward compatible: `renderReasoning(text, stringLabel)` still
  * produces the same markdown output as v0.2.0.
@@ -13,6 +15,10 @@
  * Reasoning metadata (duration, token count) is rendered as a header badge
  * when supplied — e.g. `> ### ── Reasoning (~1.2s, 450 tokens) ──`. When no
  * metadata is provided the header is byte-identical to v0.2.0.
+ *
+ * `maxLines` truncates the reasoning text before rendering, appending an
+ * italic elision line `> *... [+N lines of reasoning truncated]...*` that
+ * picks up the surrounding render style.
  */
 
 /**
@@ -131,19 +137,25 @@ function isListLine(trimmed) {
 }
 
 /**
- * Render the body of a markdown reasoning blockquote, preserving code fences,
- * indentation, and list syntax. Lines inside a fenced code block (` ``` ` or
- * `~~~`) are wrapped as `> ${line}` with their original leading whitespace
- * so indentation survives. Markdown list items are also passed through
- * verbatim to keep the list marker at column 0 of the quoted content.
- * Paragraph lines keep the legacy `> *${line.trim()}*` italic styling.
+ * Format pre-split lines of reasoning text as a blockquote, preserving code
+ * fences, indentation, and list syntax. Shared by the `markdown` and `quote`
+ * render styles — the only difference between them is whether plain paragraph
+ * lines get italic asterisk wrapping (`markdown` → `formatReasoningLine`) or
+ * pass through as `> ${line}` (`quote`).
  *
- * @param {string} reasoningText - Raw reasoning text (may contain newlines).
- * @returns {string} The body block (no header, no trailing blank-line separator).
+ * Lines inside a fenced code block (` ``` ` or `~~~`) are wrapped as
+ * `> ${line}` with their original leading whitespace so indentation survives.
+ * Markdown list items also pass through verbatim to keep the list marker at
+ * column 0 of the quoted content. Blank lines emit a bare `>` to maintain
+ * the blockquote structure.
+ *
+ * @param {string[]} lines - Lines of reasoning text (already split on `\n`).
+ * @param {{italicParagraphs?: boolean}} [options]
+ * @returns {string[]} The blockquoted lines, ready to be joined with `\n`.
  */
-function renderMarkdownBody(reasoningText) {
-    const lines = reasoningText.split("\n")
+function formatLinesAsBlockquote(lines, {italicParagraphs = false} = {}) {
     let inCodeFence = false
+    /** @type {string[]} */
     const out = []
     for (const rawLine of lines) {
         const trimmed = rawLine.trim()
@@ -164,9 +176,55 @@ function renderMarkdownBody(reasoningText) {
             out.push(`> ${rawLine}`)
             continue
         }
-        out.push(formatReasoningLine(rawLine))
+        out.push(italicParagraphs ? formatReasoningLine(rawLine) : `> ${rawLine}`)
     }
-    return out.join("\n")
+    return out
+}
+
+/**
+ * Render the body of a markdown reasoning blockquote, preserving code fences,
+ * indentation, and list syntax. Lines inside a fenced code block (` ``` ` or
+ * `~~~`) are wrapped as `> ${line}` with their original leading whitespace
+ * so indentation survives. Markdown list items are also passed through
+ * verbatim to keep the list marker at column 0 of the quoted content.
+ * Paragraph lines keep the legacy `> *${line.trim()}*` italic styling.
+ *
+ * @param {string} reasoningText - Raw reasoning text (may contain newlines).
+ * @returns {string} The body block (no header, no trailing blank-line separator).
+ */
+function renderMarkdownBody(reasoningText) {
+    return formatLinesAsBlockquote(reasoningText.split("\n"), {italicParagraphs: true}).join("\n")
+}
+
+/**
+ * Truncate a multi-line text to at most `maxLines` lines, appending a note
+ * indicating how many lines were dropped. Used by `renderReasoning` to honour
+ * the user's `maxLines` config before delegating to the chosen renderer. The
+ * resulting string is meant to be passed verbatim through whichever render
+ * style is active — the appended indicator is itself a blockquote-prefixed
+ * italic line, so it picks up the same decoration as the surrounding body.
+ *
+ * If the input has fewer or equal lines than `maxLines`, it is returned
+ * unchanged. `maxLines` that does not parse as a positive integer disables
+ * truncation (defensive — callers should validate upstream, but this keeps
+ * the helper safe to use on raw user input).
+ *
+ * @param {string} text - Raw reasoning text (may contain newlines).
+ * @param {*} maxLines - Maximum number of lines to retain (positive integer).
+ * @returns {string} The original text when under the limit, otherwise the
+ *   first `maxLines` lines followed by a blockquote-prefixed truncation note.
+ */
+export function truncateLines(text, maxLines) {
+    if (!Number.isInteger(maxLines) || maxLines <= 0) {
+        return text
+    }
+    const lines = text.split("\n")
+    if (lines.length <= maxLines) {
+        return text
+    }
+    const retained = lines.slice(0, maxLines).join("\n")
+    const remaining = lines.length - maxLines
+    return `${retained}\n> *... [+${remaining} lines of reasoning truncated]...*`
 }
 
 /**
@@ -185,17 +243,19 @@ function escapeHtml(value) {
 }
 
 /**
- * Resolve a polymorphic second argument into a `{label, style, metadata}`
+ * Resolve a polymorphic second argument into a `{label, style, metadata, maxLines}`
  * options object. Accepts a string (treated as the label, style and
- * metadata default), an object with `{label, style, metadata}`, or any
- * falsy value (defaults all three). Invalid styles fall back to `"markdown"`.
+ * metadata default), an object with `{label, style, metadata, maxLines}`, or any
+ * falsy value (defaults all of them). Invalid styles fall back to `"markdown"`.
+ * `maxLines` only passes through when it is a positive integer — defensive against
+ * user-input drift (`null`, `0`, negative, strings, NaN, floats all drop the field).
  *
- * @param {string|{label?: string, style?: string, metadata?: object}|undefined|null} optionsOrLabel
- * @returns {{label: string, style: string, metadata: object|undefined}}
+ * @param {string|{label?: string, style?: string, metadata?: object, maxLines?: *}|undefined|null} optionsOrLabel
+ * @returns {{label: string, style: string, metadata: object|undefined, maxLines: number|undefined}}
  */
 function normalizeOptions(optionsOrLabel) {
     if (typeof optionsOrLabel === "string") {
-        return {label: optionsOrLabel, style: "markdown", metadata: undefined}
+        return {label: optionsOrLabel, style: "markdown", metadata: undefined, maxLines: undefined}
     }
     if (optionsOrLabel && typeof optionsOrLabel === "object") {
         const label =
@@ -211,9 +271,15 @@ function normalizeOptions(optionsOrLabel) {
             typeof optionsOrLabel.metadata === "object" && optionsOrLabel.metadata !== null
                 ? optionsOrLabel.metadata
                 : undefined
-        return {label, style, metadata}
+        const maxLines =
+            typeof optionsOrLabel.maxLines === "number" &&
+            Number.isInteger(optionsOrLabel.maxLines) &&
+            optionsOrLabel.maxLines > 0
+                ? optionsOrLabel.maxLines
+                : undefined
+        return {label, style, metadata, maxLines}
     }
-    return {label: "Reasoning", style: "markdown", metadata: undefined}
+    return {label: "Reasoning", style: "markdown", metadata: undefined, maxLines: undefined}
 }
 
 /**
@@ -288,6 +354,60 @@ function renderRaw(reasoningText, _label, _metadata) {
 }
 
 /**
+ * Render reasoning text as a clean GFM blockquote — same shape as the
+ * `markdown` style but WITHOUT italic asterisk wrapping on paragraph lines.
+ * Code fences, indentation, and list syntax are preserved by the shared
+ * `formatLinesAsBlockquote` state machine; only the paragraph branch is
+ * changed (pass-through instead of italic).
+ *
+ * Intended for terminals that already render italic weakly (e.g. consoles
+ * without ANSI italic) — the `quote` style keeps the blockquote-looking
+ * separator while avoiding the asterisk soup that garbles on plain TUI.
+ *
+ * `metadata` is accepted for signature parity with the polymorphic dispatcher
+ * but is intentionally ignored — the `quote` style does not surface a badge.
+ *
+ * @param {string} reasoningText - Raw reasoning text (may contain newlines).
+ * @param {string|undefined} label - Header label; falls back to "Reasoning".
+ * @param {object} [_metadata] - Ignored; present for dispatcher signature parity.
+ * @returns {string} Blockquote block ending with `\n\n`.
+ */
+function renderQuote(reasoningText, label, _metadata) {
+    const safeLabel = typeof label === "string" && label.length > 0 ? label : "Reasoning"
+    const header = formatHeader(safeLabel)
+    const body = formatLinesAsBlockquote(reasoningText.split("\n"), {italicParagraphs: false}).join(
+        "\n"
+    )
+    return `${header}\n${body}\n\n`
+}
+
+/**
+ * Render reasoning text as a compact summary badge: a single-line header that
+ * records the total line count, followed by only the FIRST line of the body
+ * wrapped in italics and a `*...*` indicator that more lines were elided.
+ * Designed for long reasoning traces in small terminals — the user sees that
+ * reasoning happened, how many lines it spanned, and a one-line preview.
+ *
+ * `metadata` is accepted for signature parity with the polymorphic dispatcher
+ * but is intentionally ignored — the `compact` style does not surface duration
+ * or token badges (its header already communicates "reasoning summary").
+ *
+ * @param {string} reasoningText - Raw reasoning text (may contain newlines).
+ * @param {string|undefined} label - Header label; falls back to "Reasoning".
+ * @param {object} [_metadata] - Ignored; present for dispatcher signature parity.
+ * @returns {string} Compact summary block ending with `\n\n`.
+ */
+function renderCompact(reasoningText, label, _metadata) {
+    const safeLabel = typeof label === "string" && label.length > 0 ? label : "Reasoning"
+    const lines = reasoningText.split("\n")
+    const lineCount = lines.length
+    const header = `> ### ── ${safeLabel} (${lineCount} lines) ──`
+    const firstLine = lines[0] !== undefined ? lines[0] : ""
+    const preview = firstLine.trim().length > 0 ? firstLine.trim() : firstLine
+    return `${header}\n> *${preview}*\n> *...*\n\n`
+}
+
+/**
  * Strategy map: style name → render function. Frozen so consumers cannot
  * accidentally mutate the dispatch table at runtime.
  * @type {Readonly<Record<string, (reasoningText: string, label?: string, metadata?: object) => string>>}
@@ -296,23 +416,30 @@ export const RENDER_STYLES = Object.freeze({
     markdown: renderMarkdownQuote,
     details: renderHtmlDetails,
     strip: renderStrip,
-    raw: renderRaw
+    raw: renderRaw,
+    quote: renderQuote,
+    compact: renderCompact
 })
 
 /**
  * Render a reasoning block using the requested style.
  *
  * Polymorphic second argument:
- * - `string`                       → label only; style + metadata default (backward-compat).
- * - `{label, style, metadata}`     → all knobs; invalid `style` silently falls back to `"markdown"`.
- * - `undefined | null`             → defaults: label `"Reasoning"`, style `"markdown"`, no metadata.
+ * - `string`                                  → label only; style + metadata default (backward-compat).
+ * - `{label, style, metadata, maxLines}`      → all knobs; invalid `style` silently falls back to `"markdown"`.
+ *                                              `maxLines` is silently dropped if not a positive integer.
+ * - `undefined | null`                        → defaults: label `"Reasoning"`, style `"markdown"`, no metadata, no truncation.
  *
  * The optional 3rd argument `metadata` is forwarded to the chosen renderer.
  * Only the `markdown` renderer currently surfaces it (header decoration); the
  * other styles ignore it but accept the parameter for dispatcher uniformity.
  *
+ * When `optionsOrLabel.maxLines` is provided and the input has more lines,
+ * `truncateLines` runs first so the truncation indicator is decorated by the
+ * chosen style (it lands inside a code-fence-safe blockquote line).
+ *
  * @param {string} reasoningText - Raw reasoning text (may contain newlines).
- * @param {string|{label?: string, style?: string, metadata?: object}|undefined|null} [optionsOrLabel]
+ * @param {string|{label?: string, style?: string, metadata?: object, maxLines?: number}|undefined|null} [optionsOrLabel]
  *   Either a label string (backward-compat) or an options object.
  * @param {{durationMs?: number, tokens?: number, budget?: number}} [metadata]
  *   Optional reasoning metadata forwarded to the renderer. When `optionsOrLabel`
@@ -320,10 +447,12 @@ export const RENDER_STYLES = Object.freeze({
  * @returns {string} Rendered reasoning block; the trailing `\n\n` separator is preserved across all styles.
  */
 export function renderReasoning(reasoningText, optionsOrLabel, metadata) {
-    const {label, style, metadata: optionsMetadata} = normalizeOptions(optionsOrLabel)
+    const {label, style, metadata: optionsMetadata, maxLines} = normalizeOptions(optionsOrLabel)
     const effectiveMetadata = optionsMetadata !== undefined ? optionsMetadata : metadata
+    const truncated =
+        maxLines !== undefined ? truncateLines(reasoningText, maxLines) : reasoningText
     const renderer = RENDER_STYLES[style] || renderMarkdownQuote
-    return renderer(reasoningText, label, effectiveMetadata)
+    return renderer(truncated, label, effectiveMetadata)
 }
 
 /**

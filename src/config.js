@@ -1,9 +1,10 @@
 /**
  * Plugin configuration defaults and safe merge.
  *
- * Config knobs in v0.3.0+:
+ * Config knobs in v0.4.0+:
  * - `label`      (header text)
- * - `style`      (render style — `markdown` | `details` | `strip` | `raw`)
+ * - `style`      (render style — `markdown` | `details` | `strip` | `raw` | `quote` | `compact`)
+ * - `maxLines`   (positive integer; truncates reasoning before rendering)
  * - `models`     (per-model overrides — optional, see `resolveModelConfig`)
  * - `customTags` (extra XML reasoning tags — optional, passed to detector)
  *
@@ -11,18 +12,21 @@
  */
 
 /**
- * @typedef {("markdown"|"details"|"strip"|"raw")} RenderStyle
+ * @typedef {("markdown"|"details"|"strip"|"raw"|"quote"|"compact")} RenderStyle
  *   How the reasoning block is rendered before the final response.
  *   - `markdown` (default) — GFM blockquote with italic body + header
  *   - `details`           — HTML `<details>`/`<summary>` collapsible
  *   - `strip`             — drops the reasoning block entirely (renders as empty string)
  *   - `raw`               — pass-through of the raw reasoning text, no decoration
+ *   - `quote`             — clean blockquote (same shape as `markdown`, NO italic wrapping)
+ *   - `compact`           — one-line header with line-count badge + first-line preview
  */
 
 /**
  * @typedef {Object} ModelConfigOverride
  * @property {RenderStyle} [style] - Render-style override applied when the model pattern matches.
  * @property {string}      [label] - Header-label override applied when the model pattern matches.
+ * @property {number}      [maxLines] - Per-model maxLines override; must be a positive integer to take effect.
  */
 
 /**
@@ -45,6 +49,7 @@
  * @typedef {Object} PluginConfig
  * @property {string}           label - Header label shown above the reasoning block.
  * @property {RenderStyle}      style - Render style for the reasoning block.
+ * @property {number}           [maxLines] - Maximum lines to retain before rendering; absent when user did not set it.
  * @property {ModelConfigMap}   [models]     - Per-model override map. Omitted when user did not provide any.
  * @property {ReadonlyArray<string>} [customTags] - Extra XML tag names recognised by the detector. Omitted when user did not provide any.
  */
@@ -53,6 +58,7 @@
  * @typedef {Object} UserConfig
  * @property {string}      [label] - Optional label override. If omitted, defaultConfig.label is used.
  * @property {RenderStyle} [style] - Optional render-style override. Unknown values silently fall back to the default (`markdown`).
+ * @property {number}      [maxLines] - Optional maxLines override. Must be a positive integer; otherwise silently dropped.
  * @property {ModelConfigMap} [models] - Optional per-model override map. Must be a plain object; otherwise silently dropped.
  * @property {ReadonlyArray<string>} [customTags] - Optional extra XML tag names. Must be an array of strings; otherwise silently dropped.
  */
@@ -62,7 +68,29 @@
  * not in this set is treated as an unknown key and falls back to the default.
  * @type {ReadonlyArray<RenderStyle>}
  */
-const ALLOWED_STYLES = Object.freeze(["markdown", "details", "strip", "raw"])
+const ALLOWED_STYLES = Object.freeze(["markdown", "details", "strip", "raw", "quote", "compact"])
+
+/**
+ * Module-private default for `maxLines`. There is no built-in ceiling — users
+ * opt in by providing a positive integer.
+ * @type {number|undefined}
+ */
+const DEFAULT_MAX_LINES = undefined
+
+/**
+ * Validate and return a user-provided `maxLines` value. Returns `undefined`
+ * when the input is not a positive integer (defensive drop). Floats,
+ * negative numbers, zero, NaN, Infinity, strings, and `null` all drop.
+ *
+ * @param {*} value
+ * @returns {number|undefined}
+ */
+function sanitizeMaxLines(value) {
+    if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+        return undefined
+    }
+    return value
+}
 
 /**
  * Frozen default plugin configuration. Returned as a fresh shallow copy by `mergeConfig`.
@@ -114,9 +142,10 @@ function sanitizeCustomTags(value) {
  * Returns a new object on every call — never mutates `defaultConfig`.
  *
  * Unknown `style` values silently fall back to `"markdown"` (forward-compat,
- * matches the existing label handling). `models` and `customTags` are OMITTED
- * from the returned config when the user did not provide them — this keeps
- * `mergeConfig({})` deepEqual to `defaultConfig` for back-compat.
+ * matches the existing label handling). `models`, `customTags`, and `maxLines`
+ * are OMITTED from the returned config when the user did not provide a valid
+ * value for them — this keeps `mergeConfig({})` deepEqual to `defaultConfig`
+ * for back-compat.
  *
  * @param {UserConfig|undefined|null|*} userConfig
  * @returns {PluginConfig}
@@ -133,11 +162,13 @@ export function mergeConfig(userConfig) {
 
     const models = sanitizeModels(userConfig.models)
     const customTags = sanitizeCustomTags(userConfig.customTags)
+    const maxLines = sanitizeMaxLines(userConfig.maxLines)
 
     const hasModels = models !== undefined && Object.keys(models).length > 0
     const hasCustomTags = customTags !== undefined && customTags.length > 0
+    const hasMaxLines = maxLines !== undefined
 
-    if (!hasValidLabel && !hasValidStyle && !hasModels && !hasCustomTags) {
+    if (!hasValidLabel && !hasValidStyle && !hasModels && !hasCustomTags && !hasMaxLines) {
         return {...defaultConfig}
     }
 
@@ -145,6 +176,9 @@ export function mergeConfig(userConfig) {
     const out = {
         label: hasValidLabel ? userConfig.label : defaultConfig.label,
         style: hasValidStyle ? userConfig.style : defaultConfig.style
+    }
+    if (hasMaxLines) {
+        out.maxLines = maxLines
     }
     if (hasModels) {
         out.models = models
@@ -190,9 +224,10 @@ function patternMatches(pattern, modelId) {
  *
  * Iterates `baseConfig.models` in insertion order and applies the FIRST
  * pattern that matches the model id (first-match-wins). When the override
- * provides `label` and/or `style`, those replace the base values; absent
- * fields fall back to the base. `models` and `customTags` are passed through
- * unchanged so the resolved config is still usable downstream.
+ * provides `label`, `style`, and/or `maxLines`, those replace the base
+ * values; invalid fields fall back to the base, absent fields fall back to
+ * the base. `models` and `customTags` are passed through unchanged so the
+ * resolved config is still usable downstream.
  *
  * Returns `baseConfig` as-is when no override matches or when `modelId` is
  * missing / non-string. Consistent with `mergeConfig`'s immutability: the
@@ -223,6 +258,9 @@ export function resolveModelConfig(modelId, baseConfig) {
         if (!override || typeof override !== "object") {
             continue
         }
+        const overrideMaxLines = sanitizeMaxLines(override.maxLines)
+        const effectiveMaxLines =
+            overrideMaxLines !== undefined ? overrideMaxLines : baseConfig.maxLines
         /** @type {PluginConfig} */
         const resolved = {
             label: typeof override.label === "string" ? override.label : baseConfig.label,
@@ -231,6 +269,9 @@ export function resolveModelConfig(modelId, baseConfig) {
                 ALLOWED_STYLES.includes(/** @type {RenderStyle} */ (override.style))
                     ? override.style
                     : baseConfig.style
+        }
+        if (effectiveMaxLines !== undefined) {
+            resolved.maxLines = effectiveMaxLines
         }
         if (baseConfig.models) {
             resolved.models = baseConfig.models
