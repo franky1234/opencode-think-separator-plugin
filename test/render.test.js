@@ -302,3 +302,23 @@ test("renderReasoning: raw style ignores metadata", () => {
     })
     assert.equal(out, "the bare text\n\n")
 })
+
+// ─── Phase 4 v4: code fence, indentation and list preservation ───────────────
+
+test("renderReasoning preserves code fences without wrapping in asterisks", () => {
+    const reasoning =
+        "Let us write code:\n```python\ndef hello():\n    return 'world'\n```\nDone thinking."
+    const rendered = renderReasoning(reasoning)
+    assert.match(rendered, /> ```python/)
+    // biome-ignore lint/complexity/noMultipleSpacesInRegularExpressionLiterals: 5-space indent is intentional and matches the v4 plan verbatim
+    assert.match(rendered, />     return 'world'/)
+    assert.match(rendered, /> ```/)
+    assert.doesNotMatch(rendered, /> \*```python\*/)
+})
+
+test("renderReasoning preserves markdown lists inside reasoning", () => {
+    const reasoning = "Steps:\n- Step 1\n- Step 2"
+    const rendered = renderReasoning(reasoning)
+    assert.match(rendered, /> - Step 1/)
+    assert.match(rendered, /> - Step 2/)
+})

@@ -94,12 +94,79 @@ export function formatHeader(label, metadata) {
 }
 
 /**
- * Format a single line of reasoning body text.
+ * Format a single line of reasoning body text as a blockquoted italic.
+ *
+ * Intended for plain paragraph lines only. Lines inside fenced code blocks
+ * or markdown list items must NOT be passed through this helper — they are
+ * formatted verbatim by `renderMarkdownBody` so that indentation, fence
+ * markers, and list syntax survive the blockquote wrapping.
+ *
  * @param {string} line - Raw line from the reasoning text.
  * @returns {string} The line as `> *${line}*` when non-blank, or `>` when blank.
  */
 export function formatReasoningLine(line) {
     return line.trim().length > 0 ? `> *${line}*` : ">"
+}
+
+/**
+ * Heuristic matcher for the first non-blank character of a markdown list item.
+ * Matches ordered (`1. `, `2) `) and unordered (`- `, `* `, `+ `) markers.
+ * @param {string} trimmed - Already `.trim()`-ed line.
+ * @returns {boolean} True when the line begins with a recognised list marker.
+ */
+function isListLine(trimmed) {
+    if (trimmed.length === 0) return false
+    const first = trimmed[0]
+    if (first === "-" || first === "*" || first === "+") {
+        return trimmed.length > 1 && trimmed[1] === " "
+    }
+    if (first >= "0" && first <= "9") {
+        const dotIdx = trimmed.indexOf(". ")
+        const parenIdx = trimmed.indexOf(") ")
+        const closeIdx =
+            dotIdx >= 0 && parenIdx >= 0 ? Math.min(dotIdx, parenIdx) : Math.max(dotIdx, parenIdx)
+        return closeIdx > 0
+    }
+    return false
+}
+
+/**
+ * Render the body of a markdown reasoning blockquote, preserving code fences,
+ * indentation, and list syntax. Lines inside a fenced code block (` ``` ` or
+ * `~~~`) are wrapped as `> ${line}` with their original leading whitespace
+ * so indentation survives. Markdown list items are also passed through
+ * verbatim to keep the list marker at column 0 of the quoted content.
+ * Paragraph lines keep the legacy `> *${line.trim()}*` italic styling.
+ *
+ * @param {string} reasoningText - Raw reasoning text (may contain newlines).
+ * @returns {string} The body block (no header, no trailing blank-line separator).
+ */
+function renderMarkdownBody(reasoningText) {
+    const lines = reasoningText.split("\n")
+    let inCodeFence = false
+    const out = []
+    for (const rawLine of lines) {
+        const trimmed = rawLine.trim()
+        if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+            inCodeFence = !inCodeFence
+            out.push(`> ${rawLine}`)
+            continue
+        }
+        if (inCodeFence) {
+            out.push(`> ${rawLine}`)
+            continue
+        }
+        if (trimmed.length === 0) {
+            out.push(">")
+            continue
+        }
+        if (isListLine(trimmed)) {
+            out.push(`> ${rawLine}`)
+            continue
+        }
+        out.push(formatReasoningLine(rawLine))
+    }
+    return out.join("\n")
 }
 
 /**
@@ -151,7 +218,11 @@ function normalizeOptions(optionsOrLabel) {
 
 /**
  * Render reasoning text as a GFM blockquote (italic body + em-dash header).
- * Backward-compatible equivalent of the v0.2.0 `renderReasoning` body.
+ * Backward-compatible equivalent of the v0.2.0 `renderReasoning` body for
+ * paragraph-only reasoning. Since v0.4.0 the body is produced by
+ * `renderMarkdownBody`, which preserves code fences, indentation, and list
+ * syntax. Paragraph lines still render as `> *${line.trim()}*`, byte-identical
+ * to v0.2.0 and v0.3.0.
  *
  * When `metadata` is supplied, a `(...)` badge is appended to the header.
  *
@@ -164,7 +235,7 @@ function normalizeOptions(optionsOrLabel) {
 function renderMarkdownQuote(reasoningText, label, metadata) {
     const safeLabel = typeof label === "string" && label.length > 0 ? label : "Reasoning"
     const header = formatHeader(safeLabel, metadata)
-    const body = reasoningText.split("\n").map(formatReasoningLine).join("\n")
+    const body = renderMarkdownBody(reasoningText)
     return `${header}\n${body}\n\n`
 }
 
