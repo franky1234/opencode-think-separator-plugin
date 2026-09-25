@@ -30,7 +30,7 @@
 
 import {mergeConfig, resolveModelConfig} from "./config.js"
 import {detectReasoning, extractReasoningFromText} from "./detect-reasoning.js"
-import {renderReasoning} from "./render.js"
+import {RENDER_STYLES, renderReasoning} from "./render.js"
 
 /**
  * Normalise the polymorphic second argument of `transformMessage` into a
@@ -62,10 +62,7 @@ function normalizeTransformOptions(optionsOrConfig) {
                 : "Reasoning"
         const style =
             typeof optionsOrConfig.style === "string" &&
-            Object.prototype.hasOwnProperty.call(
-                {markdown: 1, details: 1, strip: 1, raw: 1},
-                optionsOrConfig.style
-            )
+            Object.prototype.hasOwnProperty.call(RENDER_STYLES, optionsOrConfig.style)
                 ? optionsOrConfig.style
                 : "markdown"
         const customTags = Array.isArray(optionsOrConfig.customTags)

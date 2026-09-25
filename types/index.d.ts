@@ -50,8 +50,9 @@ export interface RenderOptions {
     style?: RenderStyle;
     /**
      * Optional reasoning metadata for header badges (e.g. duration, tokens).
-     * Forwarded to the chosen renderer; only `markdown` currently renders a
-     * badge from it. All fields are optional and silently ignored if absent.
+     * Forwarded to the chosen renderer; only `markdown` and `markdown-rendered`
+     * currently render a badge from it. All fields are optional and silently
+     * ignored if absent.
      */
     metadata?: ReasoningMetadata;
     /**

@@ -84,6 +84,27 @@ test("pipeline: transformMessage with style:'details' renders <details> block", 
     assert.match(msg.parts[0].text, /surface answer/)
 })
 
+test("pipeline: transformMessage with style 'markdown-rendered' renders real header (not blockquote)", () => {
+    const msg = {parts: [{type: "text", text: "<think>\n*italic* thought\n</think>\nAnswer"}]}
+    transformMessage(msg, {label: "R", style: "markdown-rendered"})
+    assert.match(msg.parts[0].text, /^### ── R ──/)
+    assert.doesNotMatch(msg.parts[0].text, /^>/m)
+})
+
+test("pipeline: transformMessage with style 'quote' is not silently downgraded to markdown", () => {
+    const msg = {parts: [{type: "text", text: "<think>\nno italics here\n</think>\nAnswer"}]}
+    transformMessage(msg, {label: "R", style: "quote"})
+    // quote style does NOT use italics wrapping
+    assert.match(msg.parts[0].text, /> no italics here/)
+    assert.doesNotMatch(msg.parts[0].text, /> \*no italics here\*/)
+})
+
+test("pipeline: transformMessage with style 'compact' produces line-count badge", () => {
+    const msg = {parts: [{type: "text", text: "<think>\nline1\nline2\nline3\n</think>\nAnswer"}]}
+    transformMessage(msg, {label: "R", style: "compact"})
+    assert.match(msg.parts[0].text, /\(3 lines\)/)
+})
+
 test("pipeline: transformMessage with {label, style: 'markdown'} and metadata renders badge", () => {
     const msg = {
         info: {role: "assistant"},

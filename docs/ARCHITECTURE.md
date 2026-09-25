@@ -270,7 +270,7 @@ When `stripHistory === true`, the chat-messages hook runs `stripHistoryReasoning
 - Consumes blockquote-prefixed body lines (`> *…*`, `> …`, or `>` for blanks).
 - Exits on the first blank line (consuming it so the final response starts immediately with no leading gap).
 - Returns the text byte-identical when no reasoning header is found.
-- Only targets render styles that produce the blockquote shape (`markdown`, `quote`, `compact`); styles `details`, `raw`, and `strip` produce different output and are unaffected by the strip.
+- Only targets render styles that produce the blockquote shape (`markdown`, `quote`, `compact`); styles `details`, `raw`, `strip`, and `markdown-rendered` produce different output and are unaffected by the strip.
 
 ## 6. Compaction directive (v0.4.0)
 
