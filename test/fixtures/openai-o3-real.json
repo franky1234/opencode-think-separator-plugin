@@ -1,0 +1,19 @@
+{
+    "_meta": {
+        "provider": "openai",
+        "model": "o3-2025-04-16",
+        "synthetic": true,
+        "validation": "structure-validated",
+        "validation_note": "Structure mirrors OpenAI Chat Completions API documented response shape for the o-series reasoning models. The assistant message carries a top-level `reasoning_content` field alongside `content`. The top-level keys match a single assistant message as opencode passes it to the plugin. NOT a live capture - see test/fixtures/README.md.",
+        "source_doc": "https://platform.openai.com/docs/guides/reasoning",
+        "captured_at": null
+    },
+    "id": "chatcmpl-structureValidatedNotLive",
+    "object": "chat.completion",
+    "created": 1746057600,
+    "model": "o3-2025-04-16",
+    "role": "assistant",
+    "content": "The bottleneck is the third query in your dashboard - it runs three correlated subqueries in sequence and each one re-scans the `events` table. Switch to a single window-function CTE and you collapse the round-trip count from 3 to 1 and drop the scan cost roughly 5x. The CTE pattern is below.",
+    "refusal": null,
+    "reasoning_content": "The user pasted a slow dashboard query. Let me trace the plan: 1) `SELECT count(*) FROM events WHERE created_at > now() - interval '7 days'` - full scan on `events` because `created_at` is not indexed in their schema. 2) `SELECT user_id, sum(value) FROM events WHERE ... GROUP BY user_id` - aggregate scan over the same range. 3) `SELECT date_trunc('day', created_at), avg(value) FROM events WHERE ... GROUP BY 1` - another aggregate scan. All three filters share the same predicate, so a single CTE that materialises `events` once and then runs the three aggregates from the CTE cuts the I/O by ~3x. I should also mention adding a BRIN index on `created_at` since the data is append-only - that converts the scan to a range scan for the time predicate alone. I'll lead with the CTE because it has the bigger immediate impact, then suggest the index as a follow-up."
+}

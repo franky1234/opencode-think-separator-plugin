@@ -1,0 +1,15 @@
+{
+    "_meta": {
+        "provider": "google",
+        "model": "gemini-2.5-pro",
+        "synthetic": true,
+        "validation": "structure-validated",
+        "validation_note": "Structure mirrors Google Gemini API documented response shape for Gemini 2.5 with thinking enabled. The assistant message carries a top-level `thoughts` string alongside `content` (the visible answer). The top-level keys match a single assistant message as opencode passes it to the plugin. NOT a live capture - see test/fixtures/README.md.",
+        "source_doc": "https://ai.google.dev/gemini-api/docs/thinking",
+        "captured_at": null
+    },
+    "role": "model",
+    "content": "Yes - set `thinkingConfig.includeThoughts = true` in your request body. With that flag, the response will carry a top-level `thoughts` string summarising the model's internal reasoning, and the visible answer is in `content` as usual.",
+    "thoughts": "The user is asking how to surface Gemini 2.5's thinking in the API response. The answer is the `includeThoughts` boolean on the `thinkingConfig` block. Without it, the API strips the model's chain-of-thought entirely; with it, the response payload gains a top-level `thoughts` field that carries the reasoning text. I should keep the visible answer short and just point at the flag - the question is configuration, not algorithm.",
+    "modelVersion": "gemini-2.5-pro"
+}

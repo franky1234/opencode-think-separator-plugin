@@ -1,0 +1,38 @@
+{
+    "_meta": {
+        "provider": "anthropic",
+        "model": "claude-3-7-sonnet-20250219",
+        "synthetic": true,
+        "validation": "structure-validated",
+        "validation_note": "Structure mirrors Anthropic Messages API documented response shape for Claude 3.7 Sonnet with extended thinking. The top-level keys match a single assistant message as opencode passes it to the plugin. NOT a live capture — see test/fixtures/README.md.",
+        "source_doc": "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking",
+        "captured_at": null
+    },
+    "id": "msg_01XYZStructureValidatedNotLive",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-3-7-sonnet-20250219",
+    "content": [
+        {
+            "type": "thinking",
+            "thinking": "The user is asking how to design a fault-tolerant retry strategy for an HTTP client. Let me think through the design space: (1) exponential backoff with jitter is well-established; (2) circuit-breaker pattern complements retry to avoid hammering a downed backend; (3) idempotency keys are essential for non-idempotent verbs; (4) budget caps (max retries x max elapsed time) prevent runaway loops. I should also consider partial-failure semantics and observability - every retry needs structured logging so on-call can trace the cascade."
+        },
+        {
+            "type": "redacted_thinking",
+            "data": "EqoBCkAaIG5vbi1jb25maWRlbnRpYWwgcmVkYWN0ZWQgdGhpbmtpbmcgY29udGVudC4gVGhlIG1vZGVsIG9wdGVkIHRvIHJlZGFjdCB0aGUgZWNvbmQgcGFzcyBvZiBpbnRlcm5hbCByZWFzb25pbmcgYmVjYXVzZSB0aGUgaW5pdGlhbCB0aGluayBibG9jayB3YXMgZmxhZ2dlZCBhcyBwb3RlbnRpYWxseSBzZW5zaXRpdmUuIFN0cnVjdHVyYWxseSB0aGlzIGlzIHJ1c3QtdmVydGljYWwtaG9yaXpvbnRhbC1wbHVzLXNpbmdsZS1zdGFja3BhY2UtaW5wdXQtYW5hbG9ndWU="
+        },
+        {
+            "type": "text",
+            "text": "A solid retry strategy has four pillars: exponential backoff with jitter, a circuit breaker, idempotency keys, and a budget cap. Combine them and your client degrades gracefully instead of cascading."
+        }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+        "input_tokens": 84,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 312,
+        "service_tier": "standard"
+    }
+}

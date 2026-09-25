@@ -1,0 +1,17 @@
+{
+    "_meta": {
+        "provider": "deepseek",
+        "model": "deepseek-reasoner",
+        "synthetic": true,
+        "validation": "structure-validated",
+        "validation_note": "Structure mirrors DeepSeek API documented response shape for the deepseek-reasoner (R1) model. The model emits <think>...</think> inline within an assistant content string. The top-level keys match a single assistant message as opencode passes it to the plugin. NOT a live capture - see test/fixtures/README.md.",
+        "source_doc": "https://api-docs.deepseek.com/guides/reasoning_model",
+        "captured_at": null
+    },
+    "id": "structure-validated-not-live",
+    "object": "chat.completion",
+    "created": 1735689600,
+    "model": "deepseek-reasoner",
+    "role": "assistant",
+    "content": "<think>We need to prove that the sum of the first n odd numbers equals n^2.\n\nApproach 1: Induction.\nBase case n=1: 1 = 1^2. OK.\nInductive step: assume S(n) = n^2. Then S(n+1) = S(n) + (2n+1) = n^2 + 2n + 1 = (n+1)^2. QED.\n\nApproach 2: Geometric pairing (gnomon). Visualise the L-shape from 1 + 3 + 5 + ...; each new odd number extends one side of the n x n square and the opposite side. The unmatched cells are filled by the next odd number.\n\nI will present both because the geometric argument gives intuition and induction gives rigour. The reader benefits from seeing the same identity through two lenses.</think>The sum of the first $n$ odd numbers equals $n^2$. Two short proofs:\n\n**Proof 1 (Induction).** Base case $n=1$: $1 = 1^2$. Inductive step: if $S(n) = n^2$, then\n$$S(n+1) = S(n) + (2n+1) = n^2 + 2n + 1 = (n+1)^2. \\quad\\blacksquare$$\n\n**Proof 2 (Gnomon).** Each new odd number $(2n+1)$ is the *gnomon* of the $(n+1)\\times(n+1)$ square - the L-shape that augments an $n\\times n$ square into the next. Stacking the gnomons builds $n^2$ exactly."
+}

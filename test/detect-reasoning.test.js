@@ -291,3 +291,68 @@ test("extractReasoningFromText does not treat mid-sentence <think> as an unclose
         "Note: <think> tags are used for reasoning. The answer is 42."
     )
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// v4 Task 6: emerging model tags (Claude 3.7 redacted_thinking, Grok thought)
+// ──────────────────────────────────────────────────────────────────────────
+
+test("detectReasoning detects Claude 3.7 redacted_thinking and thinking signatures", () => {
+    const msg = {
+        content: [
+            {type: "redacted_thinking", data: "encrypted_signature_data"},
+            {type: "thinking", thinking: "Claude 3.7 thinking process"}
+        ]
+    }
+    const result = detectReasoning(msg)
+    assert.ok(result)
+    assert.strictEqual(result.reasoning, "Claude 3.7 thinking process")
+})
+
+test("detectReasoning detects Grok <thought> tags", () => {
+    const msg = {content: "<thought>Grok reasoning</thought>Hello"}
+    const result = detectReasoning(msg)
+    assert.ok(result)
+    assert.strictEqual(result.reasoning, "Grok reasoning")
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// v4 Task 6: real-shape fixture regression tests
+// ──────────────────────────────────────────────────────────────────────────
+
+test("detectReasoning loads Anthropic Claude 3.7 fixture (redacted_thinking + thinking blocks)", () => {
+    const msg = fixture("anthropic-claude-3-7.json")
+    const r = detectReasoning(msg)
+    assert.ok(r, "should detect reasoning from Claude 3.7 fixture")
+    assert.equal(r.kind, "block")
+    assert.equal(r.source, "thinking", "first reasoning block wins over the redacted follow-up")
+    assert.match(r.reasoning, /fault-tolerant retry strategy/)
+})
+
+test("detectReasoning loads DeepSeek R1 fixture (<think>...</think> inline)", () => {
+    const msg = fixture("deepseek-r1-real.json")
+    const r = detectReasoning(msg)
+    assert.ok(r, "should detect reasoning from DeepSeek R1 fixture")
+    assert.equal(r.kind, "text_tag")
+    assert.equal(r.source, "tag")
+    assert.match(r.reasoning, /sum of the first n odd numbers/)
+    assert.match(r.reasoning, /gnomon/)
+})
+
+test("detectReasoning loads OpenAI o3 fixture (top-level reasoning_content)", () => {
+    const msg = fixture("openai-o3-real.json")
+    const r = detectReasoning(msg)
+    assert.ok(r, "should detect reasoning from OpenAI o3 fixture")
+    assert.equal(r.kind, "field")
+    assert.equal(r.source, "reasoning_content")
+    assert.match(r.reasoning, /Let me trace the plan/)
+    assert.match(r.reasoning, /BRIN index/)
+})
+
+test("detectReasoning loads Google Gemini 2.5 fixture (top-level thoughts)", () => {
+    const msg = fixture("google-gemini-2-5-real.json")
+    const r = detectReasoning(msg)
+    assert.ok(r, "should detect reasoning from Gemini 2.5 fixture")
+    assert.equal(r.kind, "field")
+    assert.equal(r.source, "thoughts")
+    assert.match(r.reasoning, /includeThoughts/)
+})
