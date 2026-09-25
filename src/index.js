@@ -220,6 +220,11 @@ function injectReasoningBlock(cleanParts, reasoningTexts, label, style, metadata
  *   (malformed reasoning block) terminates the strip at the first non-block
  *   line and keeps that line — defensive against accidental damage.
  *
+ * Style note: this strip targets the rendered blockquote shape
+ * (`markdown`, `quote`, `compact` styles). Styles like `details`, `raw`,
+ * and `strip` produce different output formats and are NOT affected by
+ * this function — their historical reasoning passes through unchanged.
+ *
  * @param {string} text - Rendered assistant text (may contain a reasoning block at the start).
  * @returns {string} The same text with the leading reasoning block (if any) removed.
  */

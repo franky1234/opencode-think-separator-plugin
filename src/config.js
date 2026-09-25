@@ -62,6 +62,10 @@
  * @property {ReadonlyArray<string>} [customTags] - Extra XML tag names recognised by the detector. Omitted when user did not provide any.
  * @property {CompactionConfig} [compaction] - Context-window protection settings. Omitted when user did not provide a valid object.
  * @property {boolean}          [stripHistory] - When true, drop rendered reasoning from historical assistant messages (the most recent `maxHistoryReasoningTurns - 1` historical messages are preserved). Omitted when user did not provide `true`.
+ *   Historical reasoning is only stripped when the render style produces a
+ *   blockquote header (the canonical `> ### ── ${label} ──` shape). Styles
+ *   like `details`, `raw`, and `strip` do NOT produce this header, so the
+ *   strip is a silent no-op for them.
  * @property {number}           [maxHistoryReasoningTurns] - Number of recent assistant turns (including the current one) that should keep their rendered reasoning. Positive integer; absent when user did not set it.
  */
 
