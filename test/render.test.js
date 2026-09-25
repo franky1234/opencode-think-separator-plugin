@@ -321,4 +321,23 @@ test("renderReasoning preserves markdown lists inside reasoning", () => {
     const rendered = renderReasoning(reasoning)
     assert.match(rendered, /> - Step 1/)
     assert.match(rendered, /> - Step 2/)
+    assert.doesNotMatch(rendered, /> \*- Step 1\*/)
+    assert.doesNotMatch(rendered, /> \*- Step 2\*/)
+})
+
+test("renderReasoning preserves ~~~ fences (tilde fences) without wrapping in asterisks", () => {
+    const reasoning = "Steps:\n~~~ruby\nputs 'hi'\n~~~\nDone."
+    const rendered = renderReasoning(reasoning)
+    assert.match(rendered, /> ~~~ruby/)
+    assert.match(rendered, /> puts 'hi'/)
+    assert.match(rendered, /> ~~~/)
+    assert.doesNotMatch(rendered, /> \*~~~ruby\*/)
+})
+
+test("renderReasoning preserves ordered markdown lists inside reasoning", () => {
+    const reasoning = "Steps:\n1. First\n2. Second"
+    const rendered = renderReasoning(reasoning)
+    assert.match(rendered, /> 1\. First/)
+    assert.match(rendered, /> 2\. Second/)
+    assert.doesNotMatch(rendered, /> \*1\. First\*/)
 })
