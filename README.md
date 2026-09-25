@@ -327,6 +327,10 @@ See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for the full matrix and expan
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Development
+
+Biome handles linting (`biome.json`); Prettier handles formatting (`prettier.config.js`). The split keeps each tool focused on its strength: Biome catches bugs (e.g. `noExplicitAny` style for the JSDoc/TS surface); Prettier applies consistent whitespace. To run both gates: `npm run check:fix`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
