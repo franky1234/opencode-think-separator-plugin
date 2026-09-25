@@ -149,11 +149,29 @@ export type ModelOverridePattern = string;
 export type ModelConfigMap = Readonly<Record<string, ModelConfigOverride>>;
 
 /**
+ * Context-window protection settings forwarded to OpenCode's session
+ * compactor. Only one knob is exposed in v0.4.0 — `stripReasoning` — which
+ * registers an `experimental.session.compacting` hook asking the compactor
+ * to drop rendered reasoning blocks from the compacted summary.
+ */
+export interface CompactionConfig {
+    /**
+     * When true, register an `experimental.session.compacting` hook that
+     * pushes a directive into `output.context` instructing OpenCode's
+     * compactor to discard reasoning blocks (`> ### ── ... ──` headers +
+     * their blockquote bodies) before generating the compacted summary.
+     * Default: `false` (no compaction hook is registered).
+     */
+    stripReasoning?: boolean;
+}
+
+/**
  * Frozen plugin configuration after `mergeConfig` resolves user overrides.
  * Returned as a fresh shallow copy on every call.
  *
- * `models`, `customTags`, and `maxLines` are OMITTED when the user did not
- * supply a valid value for them — this keeps `mergeConfig({})` deepEqual to
+ * `models`, `customTags`, `maxLines`, `compaction`, `stripHistory`, and
+ * `maxHistoryReasoningTurns` are OMITTED when the user did not supply a
+ * valid value for them — this keeps `mergeConfig({})` deepEqual to
  * `defaultConfig` for back-compat.
  */
 export interface PluginConfig {
@@ -178,6 +196,30 @@ export interface PluginConfig {
      * silently by the detector.
      */
     customTags?: ReadonlyArray<string>;
+    /**
+     * Context-window protection settings. Present only when the user
+     * supplied a non-empty `compaction` object. When `stripReasoning` is
+     * `true`, the plugin registers an `experimental.session.compacting`
+     * hook on the plugin object.
+     */
+    compaction?: CompactionConfig;
+    /**
+     * When true, the `experimental.chat.messages.transform` hook removes the
+     * rendered reasoning block from historical assistant messages BEFORE
+     * the per-message transform loop runs. The most recent assistant message
+     * is preserved; older assistant messages are stripped in chronological
+     * order, keeping only the last `maxHistoryReasoningTurns - 1` historical
+     * entries intact. Present only when the user explicitly opts in with
+     * `true`.
+     */
+    stripHistory?: boolean;
+    /**
+     * Number of recent assistant turns (including the CURRENT one) that
+     * keep their rendered reasoning when `stripHistory` is on. Default
+     * `1` when the user did not supply a positive integer. Present only
+     * when the user supplied a positive integer.
+     */
+    maxHistoryReasoningTurns?: number;
 }
 
 /**
@@ -215,6 +257,28 @@ export interface UserConfig {
      * built-in tag name are deduped silently by the detector.
      */
     customTags?: ReadonlyArray<string>;
+    /**
+     * Optional context-window protection settings. Must be a plain object;
+     * non-objects (including strings, arrays, null) are silently dropped.
+     * Only `stripReasoning: true` survives the sanitization pass — other
+     * fields are reserved for future use and ignored.
+     */
+    compaction?: CompactionConfig;
+    /**
+     * Optional flag to prune reasoning from historical assistant messages.
+     * Must be the literal boolean `true`; any other shape (string "true",
+     * `1`, object, etc.) is silently dropped so a typo cannot enable the
+     * feature.
+     */
+    stripHistory?: boolean;
+    /**
+     * Optional positive integer that controls how many recent assistant
+     * turns keep their rendered reasoning when `stripHistory` is enabled.
+     * `1` keeps only the current turn; `2` keeps current + 1 historical.
+     * Default `1` when omitted. Must be a positive integer; other shapes
+     * are silently dropped.
+     */
+    maxHistoryReasoningTurns?: number;
 }
 
 /**

@@ -196,6 +196,141 @@ function injectReasoningBlock(cleanParts, reasoningTexts, label, style, metadata
 }
 
 /**
+ * Remove the already-rendered reasoning block from a piece of assistant text.
+ *
+ * The reasoning block has a fixed canonical shape produced by the renderer:
+ * a header line (`> ### ── <label> ──`), followed by blockquote-prefixed body
+ * lines (`> *...*`, `> ...`, or `>` for blank body lines inside the
+ * blockquote), followed by a blank line that separates the reasoning block
+ * from the final response.
+ *
+ * This is a label-agnostic strip: it matches any `> ### ── ... ──` header so
+ * users with custom labels still get the reasoning block removed correctly.
+ * Returns a new string with the reasoning block fully removed (header + body
+ * + the trailing blank-line separator), leaving only the final response text.
+ *
+ * Algorithm: line-by-line scan (more robust than a single regex because the
+ * blockquote body can contain code fences and lists that defeat greedy
+ * matching). State machine with two modes — "copy" (default) and "strip"
+ * (entered when the header is matched, exited when a blank line is found).
+ *
+ * Edge cases:
+ * - Text with no reasoning header is returned byte-identical.
+ * - A trailing `> ...` blockquote line that is NOT followed by a blank line
+ *   (malformed reasoning block) terminates the strip at the first non-block
+ *   line and keeps that line — defensive against accidental damage.
+ *
+ * @param {string} text - Rendered assistant text (may contain a reasoning block at the start).
+ * @returns {string} The same text with the leading reasoning block (if any) removed.
+ */
+export function stripReasoningBlock(text) {
+    if (typeof text !== "string" || text.length === 0) return text
+    const lines = text.split("\n")
+    /** @type {string[]} */
+    const out = []
+    let stripping = false
+    for (const line of lines) {
+        if (!stripping) {
+            if (line.startsWith("> ### ──")) {
+                stripping = true
+                continue
+            }
+            out.push(line)
+            continue
+        }
+        // Stripping mode — consume blockquote lines + the blank-line terminator.
+        if (line.length === 0) {
+            // Blank line ends the reasoning block. Consume it so the final
+            // response starts immediately with no leading gap.
+            stripping = false
+            continue
+        }
+        if (line.startsWith(">")) {
+            // Blockquote-prefixed body line — consume.
+            continue
+        }
+        // Non-blockquote content reached before a blank line. Treat as the end
+        // of the reasoning block; preserve this line (defensive against
+        // malformed input where the blank-line terminator is missing).
+        stripping = false
+        out.push(line)
+    }
+    return out.join("\n")
+}
+
+/**
+ * Strip the rendered reasoning block from HISTORICAL assistant messages
+ * (every assistant message except the most recent one). Keeps the last
+ * `maxHistoryReasoningTurns - 1` historical messages intact so the most
+ * recent reasoning traces remain available to the model. The CURRENT
+ * (most recent) assistant message is NEVER stripped — its reasoning is the
+ * most relevant context for the next turn.
+ *
+ * Mutates `messages` in place. Non-assistant messages and assistant messages
+ * without text parts are skipped. Text parts without a reasoning block are
+ * returned byte-identical (the strip is a no-op for them).
+ *
+ * @param {Array<Record<string, unknown>>} messages - Hook output messages array (mutated).
+ * @param {number} maxHistoryReasoningTurns - Positive integer; controls how many historical assistant turns KEEP their reasoning. `1` keeps only the current (no historical), `2` keeps current + 1 historical, etc.
+ * @returns {void}
+ */
+function stripHistoryReasoning(messages, maxHistoryReasoningTurns) {
+    if (!Array.isArray(messages) || messages.length === 0) return
+    if (!Number.isInteger(maxHistoryReasoningTurns) || maxHistoryReasoningTurns <= 0) return
+
+    /** @type {number[]} */
+    const assistantIndices = []
+    for (let i = 0; i < messages.length; i += 1) {
+        const msg = messages[i]
+        if (!msg || typeof msg !== "object") continue
+        const info = /** @type {{role?: string}} */ (
+            /** @type {{info?: {role?: unknown}}} */ (msg).info
+        )
+        if (info && info.role === "assistant") {
+            assistantIndices.push(i)
+        }
+    }
+    if (assistantIndices.length <= 1) return
+
+    // The most recent assistant message is the "current" — never strip it.
+    // The historical set is everything else; we keep the trailing
+    // (maxHistoryReasoningTurns - 1) entries of that historical set.
+    const keepHistorical = Math.max(0, maxHistoryReasoningTurns - 1)
+    const stripUntil = Math.max(0, assistantIndices.length - 1 - keepHistorical)
+    for (let i = 0; i < stripUntil; i += 1) {
+        const msgIdx = assistantIndices[i]
+        const msg = messages[msgIdx]
+        if (!msg || typeof msg !== "object") continue
+        const parts = /** @type {Array<unknown>} */ (/** @type {{parts?: unknown}} */ (msg).parts)
+        if (!Array.isArray(parts)) continue
+        for (const part of parts) {
+            if (!part || typeof part !== "object") continue
+            const objPart = /** @type {{type?: string, text?: string}} */ (part)
+            if (objPart.type === "text" && typeof objPart.text === "string") {
+                objPart.text = stripReasoningBlock(objPart.text)
+            }
+        }
+    }
+}
+
+/**
+ * v0.4.0+: directive string appended to `output.context` when
+ * `config.compaction.stripReasoning === true`. OpenCode's compactor reads
+ * each string in `output.context` and treats them as guidance for the
+ * summary — this message asks it to discard rendered reasoning blocks
+ * (`> ### ── ... ──` headers + their blockquote bodies) so the compacted
+ * summary only carries the final response text, freeing context window
+ * for new turns.
+ *
+ * The phrase "Discard all reasoning blocks" is asserted by the spec test
+ * (test/compaction.test.js); the parenthetical describes the exact block
+ * shape so the compactor knows which markdown construct to drop without
+ * guessing.
+ */
+const COMPACTION_STRIP_REASONING_DIRECTIVE =
+    "Discard all reasoning blocks (sections starting with '> ### ──' and continuing until the next blank line) before generating the compacted summary. Keep only the final response text."
+
+/**
  * Factory: builds the opencode v1 plugin object. The returned async function
  * is the implementation of `experimental.chat.messages.transform`.
  *
@@ -205,21 +340,50 @@ function injectReasoningBlock(cleanParts, reasoningTexts, label, style, metadata
  * (or with `info` missing) fall back to the base config — matches v0.2.0
  * behaviour for environments that do not populate `msg.info.model`.
  *
+ * v0.4.0+: when `config.stripHistory` is enabled, the
+ * `experimental.chat.messages.transform` hook first strips the rendered
+ * reasoning block from historical assistant messages BEFORE running the
+ * per-message transform loop. This drops reasoning tokens from the
+ * long-tail of the conversation without affecting the most recent turn.
+ *
+ * v0.4.0+: when `config.compaction.stripReasoning` is enabled, a second
+ * hook `experimental.session.compacting` is registered alongside the
+ * chat-messages transform. That hook receives `(input, output)` where
+ * `output.context` is an array of directive strings; the plugin pushes a
+ * single instruction that asks OpenCode's compactor to discard reasoning
+ * blocks from the compacted summary.
+ *
  * @param {Record<string, unknown> | undefined} _input - Plugin load input (unused; opencode-specific).
  * @param {import("../types/index.js").UserConfig | undefined} options - User config object.
- * @returns {Promise<Record<string, unknown>>} Plugin object with the chat-messages transform hook.
+ * @returns {Promise<Record<string, unknown>>} Plugin object with one or two hook implementations.
  */
 export const ThinkSeparator = async (
     /** @type {Record<string, unknown> | undefined} */ _input,
     /** @type {import("../types/index.js").UserConfig | undefined} */ options
 ) => {
     const baseConfig = mergeConfig(options || {})
-    return {
+    /** @type {Record<string, unknown>} */
+    const plugin = {
         "experimental.chat.messages.transform": async (
             /** @type {Record<string, unknown> | undefined} */ _hookInput,
             /** @type {{messages?: Array<Record<string, unknown>>} | undefined} */ output
         ) => {
             if (!output || !Array.isArray(output.messages)) return
+
+            // History-pruning step (v0.4.0+): when enabled, remove the rendered
+            // reasoning block from historical assistant messages BEFORE the
+            // per-message transform loop runs. Done first so the per-message
+            // loop sees clean input for stripped messages (no re-detection of
+            // dropped reasoning). Defaults `maxHistoryReasoningTurns` to 1
+            // when the user did not specify a positive integer.
+            if (baseConfig.stripHistory === true) {
+                const maxTurns =
+                    baseConfig.maxHistoryReasoningTurns !== undefined
+                        ? baseConfig.maxHistoryReasoningTurns
+                        : 1
+                stripHistoryReasoning(output.messages, maxTurns)
+            }
+
             for (const msg of output.messages) {
                 if (msg.info && /** @type {{role?: string}} */ (msg.info).role !== "assistant")
                     continue
@@ -234,6 +398,22 @@ export const ThinkSeparator = async (
             }
         }
     }
+
+    // Register the compaction hook ONLY when the user opts in. This keeps the
+    // plugin's surface minimal and avoids surprising downstream consumers
+    // that introspect the plugin object (only `experimental.chat.messages.transform`
+    // is the v0.x contract; the compaction hook is v0.4.0+ opt-in).
+    if (baseConfig.compaction?.stripReasoning === true) {
+        plugin["experimental.session.compacting"] = async (
+            /** @type {Record<string, unknown> | undefined} */ _hookInput,
+            /** @type {{context?: Array<string>} | undefined} */ output
+        ) => {
+            if (!output || !Array.isArray(output.context)) return
+            output.context.push(COMPACTION_STRIP_REASONING_DIRECTIVE)
+        }
+    }
+
+    return plugin
 }
 
 /**

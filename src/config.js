@@ -7,6 +7,9 @@
  * - `maxLines`   (positive integer; truncates reasoning before rendering)
  * - `models`     (per-model overrides — optional, see `resolveModelConfig`)
  * - `customTags` (extra XML reasoning tags — optional, passed to detector)
+ * - `compaction`       (context-window protection — `{ stripReasoning?: boolean }`, optional)
+ * - `stripHistory`     (boolean — when true, drop rendered reasoning from HISTORICAL messages, optional)
+ * - `maxHistoryReasoningTurns` (positive integer — # recent assistant turns to keep, default 1)
  *
  * Forward-compat: mergeConfig ignores unknown keys so older configs keep working.
  */
@@ -46,12 +49,20 @@
  */
 
 /**
+ * @typedef {Object} CompactionConfig
+ * @property {boolean} [stripReasoning] - When true, register an `experimental.session.compacting` hook that instructs OpenCode's compactor to discard reasoning blocks before generating the compacted summary.
+ */
+
+/**
  * @typedef {Object} PluginConfig
  * @property {string}           label - Header label shown above the reasoning block.
  * @property {RenderStyle}      style - Render style for the reasoning block.
  * @property {number}           [maxLines] - Maximum lines to retain before rendering; absent when user did not set it.
  * @property {ModelConfigMap}   [models]     - Per-model override map. Omitted when user did not provide any.
  * @property {ReadonlyArray<string>} [customTags] - Extra XML tag names recognised by the detector. Omitted when user did not provide any.
+ * @property {CompactionConfig} [compaction] - Context-window protection settings. Omitted when user did not provide a valid object.
+ * @property {boolean}          [stripHistory] - When true, drop rendered reasoning from historical assistant messages (the most recent `maxHistoryReasoningTurns - 1` historical messages are preserved). Omitted when user did not provide `true`.
+ * @property {number}           [maxHistoryReasoningTurns] - Number of recent assistant turns (including the current one) that should keep their rendered reasoning. Positive integer; absent when user did not set it.
  */
 
 /**
@@ -61,6 +72,9 @@
  * @property {number}      [maxLines] - Optional maxLines override. Must be a positive integer; otherwise silently dropped.
  * @property {ModelConfigMap} [models] - Optional per-model override map. Must be a plain object; otherwise silently dropped.
  * @property {ReadonlyArray<string>} [customTags] - Optional extra XML tag names. Must be an array of strings; otherwise silently dropped.
+ * @property {CompactionConfig} [compaction] - Optional context-window protection. Must be a plain object; otherwise silently dropped.
+ * @property {boolean}     [stripHistory] - Optional flag to prune reasoning from historical messages. Must be a boolean; otherwise silently dropped.
+ * @property {number}      [maxHistoryReasoningTurns] - Optional positive integer (default `1` when `stripHistory` is on).
  */
 
 /**
@@ -90,6 +104,56 @@ function sanitizeMaxLines(value) {
         return undefined
     }
     return value
+}
+
+/**
+ * Validate and return a user-provided `compaction` object. Returns `undefined`
+ * when the input is not a plain object (forward-compat silent drop). Only
+ * well-formed boolean fields survive — any other shape (`null`, arrays,
+ * strings, primitives) is rejected. Empty objects (no recognised fields) are
+ * also dropped so `mergeConfig({compaction: {}})` keeps the back-compat
+ * invariant `mergeConfig({})` deep-equals `defaultConfig`.
+ *
+ * @param {*} value
+ * @returns {CompactionConfig | undefined}
+ */
+function sanitizeCompaction(value) {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        return undefined
+    }
+    /** @type {CompactionConfig} */
+    const out = {}
+    if (value.stripReasoning === true) {
+        out.stripReasoning = true
+    }
+    return Object.keys(out).length > 0 ? out : undefined
+}
+
+/**
+ * Validate and return a user-provided `stripHistory` flag. Returns `true` only
+ * when the input is the literal boolean `true`; everything else (`false`,
+ * strings, numbers, objects, `null`, `undefined`) drops to `undefined`. The
+ * boolean check is strict so a typo like `"true"` does NOT enable the feature.
+ *
+ * @param {*} value
+ * @returns {true | undefined}
+ */
+function sanitizeStripHistory(value) {
+    return value === true ? true : undefined
+}
+
+/**
+ * Validate and return a user-provided `maxHistoryReasoningTurns` value.
+ * Returns `undefined` when the input is not a positive integer. Same defensive
+ * shape as `sanitizeMaxLines` — floats, zero, negatives, NaN, Infinity,
+ * strings, and `null` all drop. The runtime consumer in src/index.js falls
+ * back to the default `1` when the merged config does not include the field.
+ *
+ * @param {*} value
+ * @returns {number|undefined}
+ */
+function sanitizeMaxHistoryReasoningTurns(value) {
+    return sanitizeMaxLines(value)
 }
 
 /**
@@ -163,12 +227,29 @@ export function mergeConfig(userConfig) {
     const models = sanitizeModels(userConfig.models)
     const customTags = sanitizeCustomTags(userConfig.customTags)
     const maxLines = sanitizeMaxLines(userConfig.maxLines)
+    const compaction = sanitizeCompaction(userConfig.compaction)
+    const stripHistory = sanitizeStripHistory(userConfig.stripHistory)
+    const maxHistoryReasoningTurns = sanitizeMaxHistoryReasoningTurns(
+        userConfig.maxHistoryReasoningTurns
+    )
 
     const hasModels = models !== undefined && Object.keys(models).length > 0
     const hasCustomTags = customTags !== undefined && customTags.length > 0
     const hasMaxLines = maxLines !== undefined
+    const hasCompaction = compaction !== undefined
+    const hasStripHistory = stripHistory === true
+    const hasMaxHistoryReasoningTurns = maxHistoryReasoningTurns !== undefined
 
-    if (!hasValidLabel && !hasValidStyle && !hasModels && !hasCustomTags && !hasMaxLines) {
+    if (
+        !hasValidLabel &&
+        !hasValidStyle &&
+        !hasModels &&
+        !hasCustomTags &&
+        !hasMaxLines &&
+        !hasCompaction &&
+        !hasStripHistory &&
+        !hasMaxHistoryReasoningTurns
+    ) {
         return {...defaultConfig}
     }
 
@@ -185,6 +266,15 @@ export function mergeConfig(userConfig) {
     }
     if (hasCustomTags) {
         out.customTags = customTags
+    }
+    if (hasCompaction) {
+        out.compaction = compaction
+    }
+    if (hasStripHistory) {
+        out.stripHistory = true
+    }
+    if (hasMaxHistoryReasoningTurns) {
+        out.maxHistoryReasoningTurns = maxHistoryReasoningTurns
     }
     return out
 }
