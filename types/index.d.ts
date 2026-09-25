@@ -1,5 +1,5 @@
 /**
- * Public type surface for opencode-think-separator-plugin v0.3.0+.
+ * Public type surface for opencode-think-separator-plugin v0.4.0+.
  *
  * This file is hand-authored. TypeScript's `noEmit` flag suppresses declaration
  * emit (see tsconfig.json), so the shapes below are the canonical API contract
