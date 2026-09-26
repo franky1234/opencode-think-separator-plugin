@@ -1,0 +1,25 @@
+{
+    "_meta": {
+        "purpose": "Synthetic smoke message for the standalone plugin smoke test (Task 13).",
+        "synthetic": true,
+        "validation": "structure-validated",
+        "validation_note": "Hand-crafted from the opencode hook input shape documented in docs/COMPATIBILITY.md and verified by the opencode `experimental.chat.messages.transform` contract in src/index.js (lines 366-423).",
+        "source_doc": "docs/COMPATIBILITY.md (## Automated CI matrix) + src/index.js (ThinkSeparator factory)",
+        "captured_at": null
+    },
+    "info": {
+        "role": "assistant",
+        "model": "claude-sonnet-4.5",
+        "provider": "anthropic"
+    },
+    "parts": [
+        {
+            "type": "reasoning",
+            "text": "The user pasted a slow dashboard query. I'll trace the plan, then summarise the result without losing the headline number."
+        },
+        {
+            "type": "text",
+            "text": "<think>The summary should keep the headline metric front-and-centre.\n\nHere is the summary you requested: the dashboard median render time dropped from 1.8s to 0.6s after the cache layer was added."
+        }
+    ]
+}

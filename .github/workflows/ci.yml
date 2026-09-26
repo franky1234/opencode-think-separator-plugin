@@ -1,0 +1,92 @@
+# Opencode Think Separator Plugin — CI workflow.
+#
+# Cross-version quality gate. Runs on every push to `main` and to the
+# active v5 development branch (`upgrade-v5`), and on every pull request
+# targeting `main`. NOT a release pipeline — releases live in
+# `.github/workflows/publish.yml`, which only fires on `v*.*.*` tags.
+#
+# What each matrix cell runs (Node 18.x, 20.x, 22.x on ubuntu-latest):
+#   1. checkout@v4
+#   2. setup-node@v4 (with npm cache keyed on package-lock.json)
+#   3. npm ci              — exact install against the committed lockfile
+#   4. npm run format:check — Prettier (no write)
+#   5. npm run lint         — Biome (no write)
+#   6. npm run check:types  — tsc --noEmit (no write)
+#   7. npm test             — node --test (includes the standalone
+#                             plugin smoke test in test/smoke.test.js)
+#
+# Gates run as separate steps (not as one combined `npm run check:fix`)
+# so the failing step in the GitHub Actions UI points directly at the
+# gate that regressed.
+#
+# Matrix contract is documented in `docs/COMPATIBILITY.md` (## Automated
+# CI matrix) — this workflow is the implementation of that contract.
+# Adding a Node version or a quality gate here is a contract change and
+# must update the doc in the same PR.
+
+name: CI
+
+on:
+    push:
+        branches:
+            - main
+            - upgrade-v5
+        paths-ignore:
+            - docs/**
+            - "**/*.md"
+            - upgrade/**
+            - ".vscode/**"
+    pull_request:
+        branches:
+            - main
+        paths-ignore:
+            - docs/**
+            - "**/*.md"
+            - upgrade/**
+            - ".vscode/**"
+
+# Cancel in-progress runs for the same ref so a follow-up push doesn't
+# pile up redundant CI runs.
+concurrency:
+    group: ci-${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+jobs:
+    quality-gate:
+        name: Node ${{ matrix.node-version }} · ubuntu-latest
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                node-version:
+                    - "18.x"
+                    - "20.x"
+                    - "22.x"
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js ${{ matrix.node-version }}
+              uses: actions/setup-node@v4
+              with:
+                  node-version: ${{ matrix.node-version }}
+                  cache: npm
+
+            - name: Install dependencies (locked)
+              run: npm ci
+
+            - name: Prettier format check
+              run: npm run format:check
+
+            - name: Biome lint
+              run: npm run lint
+
+            - name: TypeScript type check
+              run: npm run check:types
+
+            - name: Run unit + smoke tests
+              run: npm test
