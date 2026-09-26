@@ -466,3 +466,57 @@ test("renderMarkdownBody emits consistent blank-line format inside and outside c
     assert.match(rendered, />\n/) // blank line as blockquote
     assert.doesNotMatch(rendered, /> \n/) // NOT trailing space
 })
+
+// ─── Phase 6 v5.1: Performance boundary at scale (1MB payload) ────────────
+//
+// renderReasoning must complete every render style (markdown, details, strip,
+// raw, quote, compact, markdown-rendered) on a 1MB reasoning text within the
+// 500ms budget. The payload is built programmatically (loop + concat) so the
+// test source stays small while still stress-testing per-line processing
+// (blockquote prefix, code-fence detection, list preservation).
+// ──────────────────────────────────────────────────────────────────────────
+
+/** Performance budget (milliseconds). Exceeding it fails the test. */
+const RENDER_PERF_BUDGET_MS = 500
+
+test("[perf] renderReasoning completes in <500ms on a 1MB payload across all 7 styles", () => {
+    // Realistic 1MB payload: interleave plain reasoning prose, code fences,
+    // and markdown lists. Each chunk is ~250 bytes; ~4200 repetitions
+    // reaches ~1MB without ever inlining a literal 1MB string.
+    const chunk =
+        "Step 1: consider the edge case where the input array is empty.\n" +
+        "```python\ndef solve(values):\n    return sum(values)\n```\n" +
+        "The function above handles empty input by returning 0 implicitly.\n" +
+        "- Check the precondition before iterating.\n" +
+        "- Verify the postcondition after the loop terminates.\n"
+    const target = 1_000_000
+    const repetitions = Math.ceil(target / chunk.length)
+    const payload = chunk.repeat(repetitions)
+    assert.ok(
+        payload.length >= 1_000_000,
+        `payload should reach ~1MB (got ${payload.length} bytes, target ${target})`
+    )
+
+    // All 7 render styles (markdown, details, strip, raw, quote, compact,
+    // markdown-rendered) must stay under the 500ms budget per call. We time
+    // each style independently so a slow style is visible in the failure
+    // message rather than hidden in an aggregate.
+    const styles = ["markdown", "details", "strip", "raw", "quote", "compact", "markdown-rendered"]
+    /** @type {Record<string, number>} */
+    const timings = {}
+    for (const style of styles) {
+        const start = performance.now()
+        const out = renderReasoning(payload, {label: "Reasoning", style})
+        const elapsed = performance.now() - start
+        timings[style] = elapsed
+        assert.ok(
+            elapsed < RENDER_PERF_BUDGET_MS,
+            `renderReasoning style=${style} on 1MB payload took ${elapsed.toFixed(2)}ms (budget ${RENDER_PERF_BUDGET_MS}ms)`
+        )
+        assert.equal(typeof out, "string", `style=${style} must return a string`)
+    }
+
+    // Sanity: strip style should drop the body entirely regardless of size
+    const stripOut = renderReasoning(payload, {style: "strip"})
+    assert.equal(stripOut, "", "strip style returns empty string for any input size")
+})
