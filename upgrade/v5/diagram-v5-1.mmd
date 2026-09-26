@@ -1,0 +1,12 @@
+flowchart TD
+    Start([Which render style?]) --> Q1{Inner markdown<br/>must render?}
+    Q1 -->|Yes italics/headers/lists| Q2{Collapsible<br/>details?}
+    Q2 -->|Yes| Details["details<br/>HTML details/summary"]
+    Q2 -->|No, plain output| Q3{Length<br/>indicator?}
+    Q3 -->|Yes, badge with count| Compact["compact<br/>line-count badge + preview"]
+    Q3 -->|No, raw text| Raw["raw<br/>verbatim reasoning"]
+    Q1 -->|No, raw thought feel| Q4{Italics<br/>wrapping?}
+    Q4 -->|Yes default| Markdown["markdown<br/>default blockquote + italics"]
+    Q4 -->|No, plain blockquote| Quote["quote<br/>blockquote no italics"]
+    Markdown -.opt-in alternative.-> MDRendered["markdown-rendered<br/>NEW v0.5.0<br/>real header + body markdown"]
+    style MDRendered fill:#90EE90

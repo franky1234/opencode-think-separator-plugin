@@ -1,0 +1,21 @@
+flowchart LR
+    subgraph Default["DEFAULT markdown style (v0.4.0)"]
+        A1[input text with *italic* thought] --> B1[renderReasoning<br/>style='markdown']
+        B1 --> C1["> ### ── Reasoning ──"]
+        C1 --> D1["> *italic* thought"]
+        D1 --> E1{{TUI display}}
+    end
+
+    subgraph New["NEW markdown-rendered style (v0.5.0)"]
+        A2[input text with *italic* thought] --> B2[renderReasoning<br/>style='markdown-rendered']
+        B2 --> C2["### ── Reasoning ──"]
+        C2 --> D2[*italic* thought]
+        D2 --> F2{{TUI display}}
+    end
+
+    E1 -.literal hash-hash-hash visible<br/>literal italic-marker visible.-> Issue1[("⚠ Markdown<br/>suppressed")]
+    F2 -.real header rendered<br/>italic actually italicized.-> Fixed1[("✓ Markdown<br/>preserved")]
+
+    style Issue1 fill:#FFB6C1
+    style Fixed1 fill:#90EE90
+    style New fill:#F0FFF0

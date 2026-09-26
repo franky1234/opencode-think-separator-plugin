@@ -15,6 +15,16 @@ The headline issue driving this plan: the `markdown` render style (default) wrap
 
 ---
 
+## 0.5. Diagrams
+
+Three architectural diagrams accompany this plan:
+
+- ![Render style decision tree](diagram-v5-1.png) — **diagram-v5-1.png**: User-facing flowchart of all 7 render styles and when to use each (markdown, markdown-rendered, quote, details, raw, strip, compact).
+- ![Markdown vs markdown-rendered pipeline](diagram-v5-2.png) — **diagram-v5-2.png**: Side-by-side comparison of the default `markdown` style (blockquote, suppresses inner markdown) vs the new `markdown-rendered` style (real header, preserves inner markdown rendering).
+- ![v5 task dependency graph](diagram-v5-3.png) — **diagram-v5-3.png**: Which tasks depend on which; Task 1 is critical (user-facing), Tasks 2–5 are independent hygiene/polish fixes that can run in parallel.
+
+---
+
 ## 1. Scope
 
 **In scope**: 13 tasks across 4 themes. All preserve the v0.4.0 public API byte-for-byte for existing callers (no breaking changes).
