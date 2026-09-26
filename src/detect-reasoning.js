@@ -55,6 +55,12 @@ const REASONING_SET = new Set(REASONING_FIELDS)
  * Passing a different array (or a custom-tags override) produces fresh
  * regex objects without mutating any cached entry.
  *
+ * Defensive: non-string elements (numbers, null, objects) are silently
+ * filtered out before pattern construction, so a mis-shaped array cannot
+ * leak garbage into the compiled alternation. An empty array after
+ * filtering falls back to the default `REASONING_TAG_NAMES` whitelist
+ * (mirrors `resolveTags`'s behaviour for `extractReasoningFromText`).
+ *
  * @param {ReadonlyArray<string>} tags
  * @returns {{CLOSED: RegExp, UNCLOSED: RegExp, ORPHAN: RegExp}}
  */
@@ -64,7 +70,13 @@ export function compileReasoningTagRegex(tags) {
     const cached = cache.get(tags)
     if (cached) return cached
 
-    const patternStr = tags.join("|")
+    /** @type {string[]} */
+    const filteredTags = []
+    for (const entry of tags) {
+        if (typeof entry === "string" && entry.length > 0) filteredTags.push(entry)
+    }
+    const effectiveTags = filteredTags.length > 0 ? filteredTags : Array.from(REASONING_TAG_NAMES)
+    const patternStr = effectiveTags.join("|")
     // Phase 1: Closed tags with optional whitespace inside tag
     const compiled = Object.freeze({
         CLOSED: new RegExp(`<\\s*(${patternStr})\\b[^>]*>([\\s\\S]*?)<\\s*\\/\\s*\\1\\s*>`, "gi"),

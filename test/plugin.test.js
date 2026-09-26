@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import {test} from "node:test"
-import {transformMessage} from "../src/index.js"
+import {ThinkSeparator, transformMessage} from "../src/index.js"
 
 const LABEL = "Reasoning"
 const DIM = "\x1b[2m"
@@ -132,4 +132,41 @@ test("transformMessage: handles unclosed <think> tag at end of text", () => {
     assert.match(msg.parts[0].text, /── Reasoning ──/)
     assert.match(msg.parts[0].text, /The user just said "hi"/)
     assert.ok(!msg.parts[0].text.includes("<think>"))
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// v5.1 Task 8: Robust edge-case coverage
+//
+// `ThinkSeparator` is the opencode v1 plugin factory — every opencode
+// session calls it with the load input and the user's plugin config.
+// Both arguments are explicitly typed as `undefined`-tolerant, but a
+// defensive call (`ThinkSeparator(null, null)`) must still produce a
+// working plugin object with the default hook implementation.
+// ──────────────────────────────────────────────────────────────────────────
+
+test("ThinkSeparator(null, null) returns a plugin with the chat-messages hook and no compaction hook", async () => {
+    // Both arguments are null. mergeConfig handles null `options` via
+    // `options || {}` (line 366). The returned plugin must expose the
+    // chat-messages transform hook (the v0.x contract) and must NOT
+    // register the compaction hook (no opt-in).
+    const plugin = await ThinkSeparator(/** @type {*} */ (null), /** @type {*} */ (null))
+    assert.ok(plugin)
+    assert.strictEqual(
+        typeof plugin["experimental.chat.messages.transform"],
+        "function",
+        "chat-messages hook must be registered"
+    )
+    assert.strictEqual(
+        plugin["experimental.session.compacting"],
+        undefined,
+        "compaction hook must NOT be registered when config is null"
+    )
+
+    // Calling the hook with a degenerate output (no messages array) must
+    // not throw — the hook's defensive guard (line 373) early-returns.
+    await assert.doesNotReject(plugin["experimental.chat.messages.transform"]({}, undefined))
+    await assert.doesNotReject(plugin["experimental.chat.messages.transform"]({}, {}))
+    await assert.doesNotReject(
+        plugin["experimental.chat.messages.transform"]({}, {messages: undefined})
+    )
 })

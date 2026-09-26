@@ -430,3 +430,58 @@ test("[ReDoS] 200KB text with pathological '<' characters complete within 500ms"
     assert.deepEqual(reasoningTexts, [], "no reasoning should be detected")
     assert.equal(typeof cleanText, "string", "cleanText must remain a string")
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// v5.1 Task 8: Robust edge-case coverage
+//
+// These tests guard against null / undefined / malformed inputs that crash
+// or produce undefined behavior in defensive branches. The tests are
+// contract tests — every assertion mirrors the documented "safe default"
+// behavior in the JSDoc.
+// ──────────────────────────────────────────────────────────────────────────
+
+test('extractReasoningFromText("") returns an empty result for the empty-string edge case', () => {
+    // Empty string: no `<`, so the function must early-return before any
+    // regex compilation. cleanText must be the empty string (not `null`,
+    // not `undefined` — callers use `cleanText.trim().length`).
+    const result = extractReasoningFromText("")
+    assert.deepEqual(result, {reasoningTexts: [], cleanText: ""})
+    assert.equal(result.reasoningTexts.length, 0)
+    assert.equal(result.cleanText, "")
+})
+
+test("extractReasoningFromText(null) does not throw and returns a safe default", () => {
+    // Null input: the function must NOT throw. Defensive branch returns
+    // `{reasoningTexts: [], cleanText: ""}` so callers can treat the result
+    // uniformly regardless of input shape.
+    const result = extractReasoningFromText(/** @type {*} */ (null))
+    assert.deepEqual(result, {reasoningTexts: [], cleanText: ""})
+})
+
+test('extractReasoningFromText("text", null) ignores null tags and uses defaults', () => {
+    // Null tags config: `resolveTags(null)` must fall back to the default
+    // REASONING_TAG_NAMES whitelist. Text without `<` short-circuits
+    // before any regex runs.
+    const result = extractReasoningFromText("text", /** @type {*} */ (null))
+    assert.deepEqual(result, {reasoningTexts: [], cleanText: "text"})
+})
+
+test("compileReasoningTagRegex filters non-string elements defensively", () => {
+    // A mis-shaped customTags entry (number, null, object) MUST NOT produce
+    // a regex that matches its non-string representation. Only the valid
+    // string element should appear in the compiled pattern.
+    const regexes = compileReasoningTagRegex(/** @type {*} */ ([123, null, "think"]))
+    // Match a valid tag — should succeed
+    const validMatch = regexes.CLOSED.exec("<think>reasoning</think>")
+    assert.ok(validMatch, "valid string element must still match")
+    assert.equal(validMatch[1], "think")
+    // The numeric `123` must NOT appear as a tag name in any match
+    assert.ok(
+        !regexes.CLOSED.source.includes("123|"),
+        "numeric element must be filtered out of the compiled pattern"
+    )
+    assert.ok(
+        !regexes.CLOSED.source.includes("|123"),
+        "numeric element must not leak into the alternation"
+    )
+})

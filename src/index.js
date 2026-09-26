@@ -272,11 +272,15 @@ export function stripReasoningBlock(text) {
  * without text parts are skipped. Text parts without a reasoning block are
  * returned byte-identical (the strip is a no-op for them).
  *
+ * Exported for direct testing (Task 8) so the defensive `maxTurns <= 0`
+ * guard can be exercised without having to first defeat `mergeConfig`'s
+ * own sanitization of negative / zero values.
+ *
  * @param {Array<Record<string, unknown>>} messages - Hook output messages array (mutated).
- * @param {number} maxHistoryReasoningTurns - Positive integer; controls how many historical assistant turns KEEP their reasoning. `1` keeps only the current (no historical), `2` keeps current + 1 historical, etc.
+ * @param {number} maxHistoryReasoningTurns - Positive integer; controls how many historical assistant turns KEEP their reasoning. `1` keeps only the current (no historical), `2` keeps current + 1 historical, etc. Values `<= 0` or non-integer short-circuit to a no-op.
  * @returns {void}
  */
-function stripHistoryReasoning(messages, maxHistoryReasoningTurns) {
+export function stripHistoryReasoning(messages, maxHistoryReasoningTurns) {
     if (!Array.isArray(messages) || messages.length === 0) return
     if (!Number.isInteger(maxHistoryReasoningTurns) || maxHistoryReasoningTurns <= 0) return
 

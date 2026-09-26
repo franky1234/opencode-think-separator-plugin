@@ -22,7 +22,7 @@
 
 import assert from "node:assert/strict"
 import test from "node:test"
-import {ThinkSeparator, stripReasoningBlock} from "../src/index.js"
+import {ThinkSeparator, stripHistoryReasoning, stripReasoningBlock} from "../src/index.js"
 
 test("ThinkSeparator registers experimental.session.compacting hook", async () => {
     const plugin = await ThinkSeparator(undefined, {
@@ -190,4 +190,63 @@ test("stripReasoningBlock keeps line if blank-line terminator is missing (defens
     assert.doesNotMatch(result, /Reasoning/)
     assert.doesNotMatch(result, /thought/)
     assert.match(result, /no blank line before this/)
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// v5.1 Task 8: Robust edge-case coverage
+//
+// These tests exercise the defensive guards inside `stripReasoningBlock`
+// and `stripHistoryReasoning`. Both functions MUST return safe defaults
+// (not throw) on malformed input — the chat-messages transform hook is
+// called once per message and any throw aborts the entire conversation.
+// ──────────────────────────────────────────────────────────────────────────
+
+test("stripReasoningBlock preserves content when the header is followed only by non-blockquote text (no separator)", () => {
+    // Malformed reasoning block: header + body + final response WITHOUT
+    // the blank-line separator. The defensive branch (line 254-258 of
+    // src/index.js) must exit stripping mode at the first non-block line
+    // and preserve the rest of the text byte-for-byte.
+    const input =
+        "> ### ── Reasoning ──\n> *thought one*\n> *thought two*\nFinal answer starts here"
+    const result = stripReasoningBlock(input)
+    // Reasoning is fully stripped
+    assert.doesNotMatch(result, /Reasoning/)
+    assert.doesNotMatch(result, /thought one/)
+    assert.doesNotMatch(result, /thought two/)
+    // Final answer is preserved verbatim
+    assert.strictEqual(result, "Final answer starts here")
+})
+
+test("stripHistoryReasoning with maxTurns <= 0 is a no-op (history kept verbatim)", () => {
+    // maxTurns <= 0 (and non-integer values) must short-circuit the strip
+    // function — the safe behaviour is "do nothing", not "strip everything"
+    // or "throw". The history below contains reasoning blocks; they must
+    // survive untouched.
+    const messages = [
+        {
+            info: {role: "assistant"},
+            parts: [{type: "text", text: "> ### ── Reasoning ──\n> *old*\n\nOld response"}]
+        },
+        {
+            info: {role: "assistant"},
+            parts: [{type: "text", text: "> ### ── Reasoning ──\n> *recent*\n\nRecent response"}]
+        }
+    ]
+    const snapshot = JSON.parse(JSON.stringify(messages))
+
+    // maxTurns = 0
+    stripHistoryReasoning(messages, 0)
+    assert.deepEqual(messages, snapshot, "maxTurns=0 must leave history untouched")
+
+    // maxTurns = -5
+    stripHistoryReasoning(messages, -5)
+    assert.deepEqual(messages, snapshot, "maxTurns=-5 must leave history untouched")
+
+    // maxTurns = NaN
+    stripHistoryReasoning(messages, Number.NaN)
+    assert.deepEqual(messages, snapshot, "NaN must leave history untouched")
+
+    // maxTurns = Infinity (not an integer → guard catches)
+    stripHistoryReasoning(messages, Number.POSITIVE_INFINITY)
+    assert.deepEqual(messages, snapshot, "Infinity must leave history untouched")
 })

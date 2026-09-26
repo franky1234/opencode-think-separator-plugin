@@ -133,3 +133,33 @@ test("resolveModelConfig falls back to baseConfig.maxLines when override is inva
     const resolved = resolveModelConfig("deepseek/v4-pro", merged)
     assert.equal(resolved.maxLines, 20, "invalid override keeps base maxLines")
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// v5.1 Task 8: Robust edge-case coverage
+//
+// `resolveModelConfig` defends against three malformed inputs:
+//   1. `modelId` is null / undefined / non-string / empty.
+//   2. `baseConfig` is null / undefined / not a plain object.
+//   3. `baseConfig.models` is missing or not a plain object.
+//
+// All three must return a safe default (the baseConfig itself, or an empty
+// equivalent) without throwing — the hook loop in ThinkSeparator iterates
+// over potentially thousands of messages, so any throw crashes the entire
+// chat-messages transform.
+// ──────────────────────────────────────────────────────────────────────────
+
+test('resolveModelConfig(null, "") returns the empty baseConfig unchanged', () => {
+    // Both inputs are degenerate. The function must NOT throw — the most
+    // permissive contract is "return the baseConfig verbatim". A bare
+    // string baseConfig has no `.models` property, so the loop is skipped.
+    const result = resolveModelConfig(/** @type {*} */ (null), /** @type {*} */ (""))
+    assert.equal(result, "")
+})
+
+test("resolveModelConfig(null, 123) returns the numeric baseConfig unchanged (no throw)", () => {
+    // Numeric baseConfig (e.g. accidentally passed by the caller) must not
+    // crash the resolver. The function checks `typeof modelId !== "string"`
+    // first and short-circuits before touching baseConfig.
+    const result = resolveModelConfig(/** @type {*} */ (null), /** @type {*} */ (123))
+    assert.equal(result, 123)
+})
