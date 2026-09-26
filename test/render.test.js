@@ -460,7 +460,7 @@ test("RENDER_STYLES map exposes the new 'markdown-rendered' style", () => {
 })
 
 test("renderMarkdownBody emits consistent blank-line format inside and outside code fence", () => {
-    const reasoning = "before\n\n```\ncode line\n```\n\nafter"
+    const reasoning = "before\n\n```\ncode line\n\nmore code\n```\n\nafter"
     const rendered = renderReasoning(reasoning, "R")
     // Both blank-line contexts produce `>` without trailing space
     assert.match(rendered, />\n/) // blank line as blockquote
