@@ -108,6 +108,68 @@ Available knobs:
 
 Unknown keys in the options are silently ignored (forward-compat). Unknown `style` values silently fall back to `"markdown"`.
 
+### Style comparison matrix
+
+Pick a render style at a glance. Each row links to a copy-pasteable `opencode.*.json` snippet under `examples/` (or to an inline snippet for the three styles that don't have a dedicated file — `details`, `raw`, `strip`).
+
+| `style`               | One-line description                                                                                                              | Example                                                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `markdown` (default)  | GFM blockquote with italic body and `### ── Label ──` header.                                                                     | Use the default — no explicit option needed.                                                                   |
+| `markdown-rendered`   | Real `### ── Label ──` heading (no `> ` prefix) + raw body; inner formatting (italics, lists, code fences) renders verbatim.      | [`examples/opencode.markdown-rendered.json`](examples/opencode.markdown-rendered.json)                         |
+| `quote`               | Same blockquote shape as `markdown` but WITHOUT italic wrapping — plain `> line` prefix. Better in terminals with weak italics.  | [`examples/opencode.quote.json`](examples/opencode.quote.json)                                                 |
+| `compact`             | One-line header with `(N lines)` badge + first-line preview; collapses long reasoning traces.                                     | [`examples/opencode.compact.json`](examples/opencode.compact.json)                                             |
+| `details`             | HTML `<details><summary>…</summary>…</details>` collapsible block.                                                               | See inline snippet below.                                                                                      |
+| `raw`                 | Pass-through of the raw reasoning text with no decoration.                                                                        | See inline snippet below.                                                                                      |
+| `strip`               | Drops the reasoning block entirely — the final response stands alone.                                                            | See inline snippet below.                                                                                      |
+
+For `details`, `raw`, and `strip` (no dedicated example file — the snippet is small enough to inline):
+
+##### `opencode.details.json` — collapsible HTML block
+
+```json
+{
+    "plugin": [
+        [
+            "opencode-think-separator-plugin",
+            {"label": "Reasoning", "style": "details"}
+        ]
+    ]
+}
+```
+
+##### `opencode.raw.json` — pass-through with no decoration
+
+```json
+{
+    "plugin": [
+        [
+            "opencode-think-separator-plugin",
+            {"label": "Reasoning", "style": "raw"}
+        ]
+    ]
+}
+```
+
+##### `opencode.strip.json` — drops the reasoning block entirely
+
+```json
+{
+    "plugin": [
+        [
+            "opencode-think-separator-plugin",
+            {"label": "Reasoning", "style": "strip"}
+        ]
+    ]
+}
+```
+
+### Configuration scenarios
+
+Beyond the render style, two common configuration scenarios are covered by dedicated example files:
+
+- **Context-window protection** — [`examples/opencode.context-window.json`](examples/opencode.context-window.json) enables `compaction.stripReasoning` (registers the `experimental.session.compacting` hook that asks the compactor to discard reasoning blocks) plus `stripHistory: true` with `maxHistoryReasoningTurns: 2` (keeps the current turn plus one historical turn; older turns are stripped).
+- **Per-model overrides** — [`examples/opencode.per-model.json`](examples/opencode.per-model.json) routes four model ids to different render styles via the `models` map (`anthropic/claude-3.7-sonnet` → `details`, `openai/o3-mini` → `compact`, `deepseek/deepseek-r1` → `raw`, `google/gemini-2.5-pro` → default `markdown` with a renamed label). Patterns are matched exactly unless they end in `/*` (prefix wildcard); first match wins.
+
 ### Examples
 
 Compact view for long reasoning traces:

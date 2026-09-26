@@ -1,0 +1,17 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "plugin": [
+        [
+            "opencode-think-separator-plugin",
+            {
+                "label": "Reasoning",
+                "style": "markdown",
+                "compaction": {
+                    "stripReasoning": true
+                },
+                "stripHistory": true,
+                "maxHistoryReasoningTurns": 2
+            }
+        ]
+    ]
+}
