@@ -356,3 +356,77 @@ test("detectReasoning loads Google Gemini 2.5 fixture (top-level thoughts)", () 
     assert.equal(r.source, "thoughts")
     assert.match(r.reasoning, /includeThoughts/)
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// v5.1 Task 6: ReDoS stress tests
+//
+// Adversarial inputs are designed to expose backtracking / catastrophic
+// polynomial blow-up in any of the 5 user-facing regexes:
+//
+//   - CLOSED, UNCLOSED, ORPHAN  (compileReasoningTagRegex)
+//   - FENCED_CODE_REGEX, INLINE_CODE_REGEX  (maskCodeSpans)
+//
+// The detector must complete each scenario in under 500ms on a developer
+// laptop. Inputs that exceed that threshold signal a real ReDoS exposure
+// that must be hardened before tagging v0.5.0.
+// ──────────────────────────────────────────────────────────────────────────
+
+/** ReDoS budget (milliseconds). Exceeding it fails the test and triggers hardening. */
+const REDOS_BUDGET_MS = 500
+
+test("[ReDoS] 10,000 unclosed <think> tags complete within 500ms", () => {
+    // 10k repetitions of an opening tag with no matching closer. The engine
+    // must NOT search for the missing closer on every candidate position
+    // (would be O(n²) or worse on a naive pattern).
+    const text = "<think>".repeat(10000)
+    const start = performance.now()
+    const {reasoningTexts, cleanText} = extractReasoningFromText(text)
+    const elapsed = performance.now() - start
+    assert.ok(
+        elapsed < REDOS_BUDGET_MS,
+        `extractReasoningFromText on 10k unclosed <think> tags took ${elapsed.toFixed(2)}ms (budget ${REDOS_BUDGET_MS}ms)`
+    )
+    // Behavioural sanity: exactly one unclosed block is captured (UNCLOSED
+    // regex is anchored to start-of-string / after newline, so the first hit
+    // swallows the rest), reasoning text is the trailing empty body.
+    assert.ok(reasoningTexts.length >= 1, "should detect at least one unclosed block")
+    assert.equal(typeof cleanText, "string", "cleanText must remain a string")
+})
+
+test("[ReDoS] 10,000 chars of unclosed code fence delimiters complete within 500ms", () => {
+    // `"\`\`\`".repeat(3000)` = 9000 chars of fence-openers with no closing
+    // fence. FENCED_CODE_REGEX has a backreference (`\2`) to the fence
+    // delimiter — without proper anchors a naive pattern would attempt
+    // every possible split of the backreference, turning a missing close
+    // into catastrophic backtracking.
+    const text = "```".repeat(3000)
+    const start = performance.now()
+    const {cleanText} = extractReasoningFromText(text)
+    const elapsed = performance.now() - start
+    assert.ok(
+        elapsed < REDOS_BUDGET_MS,
+        `extractReasoningFromText on 10k chars of unclosed fences took ${elapsed.toFixed(2)}ms (budget ${REDOS_BUDGET_MS}ms)`
+    )
+    assert.equal(typeof cleanText, "string", "cleanText must remain a string")
+})
+
+test("[ReDoS] 200KB text with pathological '<' characters complete within 500ms", () => {
+    // ~200KB of interleaved `<<<tag>>>` fragments where consecutive openers
+    // (`<<<`) are immediately closed by `>>>` before the next fragment opens
+    // a new tag. No reasoning tag is ever fully opened, so every regex must
+    // backtrack only linearly (not O(n²) or exponential) to confirm no
+    // reasoning is present. The repeating pattern also creates many
+    // candidate positions for the `[^>]*` and `\b` sub-patterns to chew on.
+    const chunk = "<<<tag>>><<<tag>>><<<tag>>><<<tag>>>"
+    const text = chunk.repeat(Math.ceil(200_000 / chunk.length))
+    assert.ok(text.length >= 200_000, `input should be at least 200KB (got ${text.length})`)
+    const start = performance.now()
+    const {reasoningTexts, cleanText} = extractReasoningFromText(text)
+    const elapsed = performance.now() - start
+    assert.ok(
+        elapsed < REDOS_BUDGET_MS,
+        `extractReasoningFromText on 200KB of pathological '<' took ${elapsed.toFixed(2)}ms (budget ${REDOS_BUDGET_MS}ms)`
+    )
+    assert.deepEqual(reasoningTexts, [], "no reasoning should be detected")
+    assert.equal(typeof cleanText, "string", "cleanText must remain a string")
+})
