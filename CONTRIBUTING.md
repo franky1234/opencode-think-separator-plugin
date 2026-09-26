@@ -2,12 +2,39 @@
 
 ## Workflow
 
-1. Open an issue first describing the change you want to make. Reference the relevant part of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the plan at [docs/superpowers/plans/think-separator-0.1.0.md](docs/superpowers/plans/think-separator-0.1.0.md).
+1. Open an issue first describing the change you want to make. Reference the relevant section of [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (architecture & render pipeline) or [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) (opencode version matrix).
 2. Fork the repo and create a branch named `feat/<short-name>` or `fix/<short-name>`.
 3. Follow TDD: write/update tests in `test/*.test.js` first, then implement.
-4. Run `npm test` — all tests must pass before opening a PR.
-5. Run `node --check src/<file>.js` on every modified file as a final sanity check.
-6. Open a PR with a clear description of what changed and why. Reference the issue it closes.
+4. Run `npm run check:fix` (the unified quality gate — see below) — all four gates must pass before opening a PR.
+5. Open a PR with a clear description of what changed and why. Reference the issue it closes.
+
+## Quality gate
+
+Before opening a PR, run the unified gate:
+
+```bash
+npm run check:fix
+```
+
+This single command runs four checks in a fixed order:
+
+| # | Step | Command | What it does |
+|---|------|---------|--------------|
+| 1 | format | `npm run format` | Prettier rewrites `src/` and `test/` JS to canonical style (writes changes). |
+| 2 | lint | `npm run lint` | Biome static-analysis check on `src/` and `test/`. |
+| 3 | types | `npm run check:types` | TypeScript `tsc --noEmit` against `types/index.d.ts`. |
+| 4 | test | `npm test` | `node --test` over `test/*.test.js`. |
+
+**Why this order matters:** Prettier runs FIRST so its rewrites are already in place before Biome lints. Running Biome on unformatted code can flag style nits as rule violations; running Prettier first ensures Biome sees canonical style and only reports real lint findings. If Prettier made changes, Biome + types + tests already include the new code, so re-running is unnecessary.
+
+**Individual gates** are also available when you want to debug a specific failure:
+
+- `npm run format:check` — Prettier in check-only mode (no writes)
+- `npm run lint` — Biome alone
+- `npm run check:types` — types alone
+- `npm test` — tests alone
+
+The gate order is declared in the `"check:fix"` script in `package.json`; do not reorder it.
 
 ## Code style
 
