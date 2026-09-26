@@ -528,6 +528,18 @@ export function renderReasoning(reasoningText, optionsOrLabel, metadata) {
 
 /**
  * Indent each line of the response text with two leading spaces (matches reasoning indent).
+ *
+ * @deprecated Since v0.4.0 the OpenCode transform pipeline uses in-memory message
+ * parts via the `experimental.chat.messages.transform` hook (see
+ * `src/index.js#transformMessage`); response text is mutated as part of the
+ * `msg.parts` array rather than reconstructed by string concatenation.
+ * `renderResponse` is preserved for backward-compatible standalone text
+ * pipelines (e.g. REST APIs, custom CLIs, docs tooling) that import
+ * `opencode-think-separator-plugin/render` and still build their output as
+ * plain markdown strings. Prefer `renderReasoning` + your own response
+ * rendering for new code; this helper will be removed in a future major
+ * release with at least one minor-version deprecation window.
+ *
  * @param {string} responseText - Raw response text (may contain newlines).
  * @returns {string} Indented response text (no trailing newline).
  */
@@ -542,6 +554,18 @@ export function renderResponse(responseText) {
  * Combine the reasoning block and the response block into a single markdown string.
  * Uses the default markdown style — `compose` does not currently accept a style knob
  * (callers needing per-call style should call `renderReasoning` + `renderResponse` directly).
+ *
+ * @deprecated Since v0.4.0 the OpenCode transform pipeline uses in-memory message
+ * parts via the `experimental.chat.messages.transform` hook (see
+ * `src/index.js#transformMessage`); reasoning + response are co-located on the
+ * same message instead of being joined into a single markdown string.
+ * `compose` is preserved for backward-compatible standalone text pipelines
+ * (e.g. REST APIs, custom CLIs, docs tooling) that import
+ * `opencode-think-separator-plugin/render` and still need a one-shot
+ * `renderReasoning(...) + renderResponse(...)` join. Prefer
+ * `renderReasoning` + your own response rendering for new code; this helper
+ * will be removed in a future major release with at least one minor-version
+ * deprecation window.
  *
  * @param {{reasoning: string}} detection - Detection result (only `reasoning` is read).
  * @param {string} responseText - Raw response text.
