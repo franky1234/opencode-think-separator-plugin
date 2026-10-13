@@ -171,7 +171,45 @@ export const NahPolicyPlugin = async ({ directory, $, client }) => {
   }
 }
 
+// ─── OpenCode V2 Adapter ───────────────────────────────────────────────────
+// OpenCode V2 loads a plugin by calling `setup(ctx)` instead of `server`.
+// The V1 `tool.execute.before` hook maps to V2 `ctx.tool.hook("execute.before")`
+// (not the session hook name "context", which is a chat hook T2 used for the
+// message transform). V2 delivers a single `call` event whose `agent` field is
+// already resolved, so no client session lookup is needed here. Mirror:
+// ~/.config/opencode/plugins/engram.ts#setupEngramV2 (its `execute.before` arm).
+
+export async function setupV2(ctx) {
+  const v1Hooks = await NahPolicyPlugin({
+    directory: ctx?.location?.directory ?? process.cwd(),
+    $: undefined,
+    client: undefined,
+  })
+
+  const registrations = []
+  if (typeof v1Hooks["tool.execute.before"] === "function") {
+    registrations.push(
+      await ctx.tool.hook("execute.before", async (call) => {
+        await v1Hooks["tool.execute.before"](
+          {
+            tool: call.tool,
+            sessionID: call.sessionID,
+            agent: call.agent,
+            callID: call.id,
+          },
+          { args: call.input && typeof call.input === "object" ? call.input : {} },
+        )
+      }),
+    )
+  }
+
+  return async () => {
+    await Promise.all(registrations.map((r) => r?.dispose?.()))
+  }
+}
+
 export default {
   id: "nah-policy",
   server: NahPolicyPlugin,
+  setup: setupV2,
 }
