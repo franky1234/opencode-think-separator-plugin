@@ -1,7 +1,7 @@
 {
     "name": "opencode-think-separator-plugin",
-    "version": "0.5.0",
-    "description": "Opencode TUI plugin that visually separates model reasoning blocks from responses. Agnostic to provider (Anthropic, OpenAI, Google, MiniMax).",
+    "version": "0.6.0",
+    "description": "Opencode TUI plugin that visually separates model reasoning blocks from responses. Agnostic to provider (Anthropic, OpenAI, Google, MiniMax). Ships both V1 (server) and V2 (setup) plugin loaders.",
     "type": "module",
     "main": "src/index.js",
     "types": "./types/index.d.ts",
@@ -19,6 +19,7 @@
         "types/",
         "bin/install.sh",
         "README.md",
+        "CHANGELOG.md",
         "LICENSE"
     ],
     "scripts": {

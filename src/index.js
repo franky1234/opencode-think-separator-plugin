@@ -469,7 +469,112 @@ export function transformMessage(msg, optionsOrConfig) {
     msg.parts = cleanParts
 }
 
+/**
+ * @typedef {{ dispose?: () => Promise<void> | void }} V2Registration
+ *   Return value of a V2 hook registration; `dispose` tears down the hook.
+ * @typedef {(name: string, callback: (event: unknown) => Promise<void> | void) => Promise<V2Registration>} V2Hook
+ *   V2 `session.hook` / `tool.hook` registration method. The callback receives
+ *   a SINGLE event object (unlike the V1 `(input, output)` pair).
+ * @typedef {{
+ *   options?: Record<string, unknown>,
+ *   session?: { hook?: V2Hook },
+ *   tool?: { hook?: V2Hook }
+ * }} V2Context
+ *   Structural type for the object opencode V2 passes to `setup(ctx)`. Only the
+ *   fields this plugin consumes are declared (mirrors engram.ts's V2Context).
+ */
+
+/**
+ * Append a directive string to a V2 session's system text parts. V2 carries
+ * the system prompt as an array of `{type: "text", text}` parts (no top-level
+ * string), so a compaction directive is folded into the trailing system part
+ * (or a new one) — the same translation engram.ts#appendSystemText performs.
+ *
+ * @param {Array<{type?: string, text?: string}> | undefined} system
+ * @param {string} text
+ */
+function appendSystemText(system, text) {
+    if (!Array.isArray(system)) return
+    const last = system[system.length - 1]
+    if (last && typeof last === "object" && typeof last.text === "string") {
+        system[system.length - 1] = {...last, text: `${last.text}\n\n${text}`}
+    } else {
+        system.push({type: "text", text})
+    }
+}
+
+/**
+ * v0.6.0+: opencode V2 plugin loader entry. V1 (`server: ThinkSeparator`) is
+ * still exported for hosts that only know V1; V2 hosts call `setup(ctx)`.
+ * The adapter reuses the V1 hook factory and translates each V1 hook into a
+ * V2 `ctx.session.hook` registration, then returns a dispose function.
+ *
+ * Mirror pattern: ~/.config/opencode/plugins/engram.ts#setupEngramV2. The V2
+ * contract differs from V1 in three ways the adapter reconciles:
+ * - `experimental.chat.messages.transform(input, output)` → V2
+ *   `session.hook("context", (event) => ...)`: V2 has no per-hook name for
+ *   message transform, so the `context` hook (the only session hook that
+ *   carries `messages`) forwards `event.messages` as `output.messages`.
+ * - `experimental.session.compacting(input, output)` → V2
+ *   `session.hook("compaction", (event) => ...)`: V2 has no `output.context`
+ *   array, so the directive is folded into `event.system`.
+ * - User config arrives as `ctx.options` (V2) instead of the V1 factory's
+ *   second argument.
+ *
+ * @param {V2Context} ctx
+ * @returns {Promise<() => Promise<void>>} Dispose function for all registrations.
+ */
+export async function setupV2(ctx) {
+    const v1Hooks = await ThinkSeparator(
+        undefined,
+        /** @type {import("../types/index.js").UserConfig | undefined} */ (ctx?.options)
+    )
+    /** @type {V2Registration[]} */
+    const registrations = []
+
+    const transform = v1Hooks["experimental.chat.messages.transform"]
+    if (typeof transform === "function" && ctx?.session?.hook) {
+        const reg = await ctx.session.hook("context", async (event) => {
+            await /** @type {(input: unknown, output: {messages?: unknown}) => Promise<void>} */ (
+                transform
+            )(
+                {
+                    sessionID: /** @type {*} */ (event)?.sessionID,
+                    model: /** @type {*} */ (event)?.model
+                },
+                {messages: /** @type {*} */ (event)?.messages}
+            )
+        })
+        registrations.push(reg)
+    }
+
+    const compacting = v1Hooks["experimental.session.compacting"]
+    if (typeof compacting === "function" && ctx?.session?.hook) {
+        const reg = await ctx.session.hook("compaction", async (event) => {
+            /** @type {string[]} */
+            const context = []
+            await /** @type {(input: unknown, output: {context?: string[]}) => Promise<void>} */ (
+                compacting
+            )({sessionID: /** @type {*} */ (event)?.sessionID}, {context})
+            if (context.length > 0) {
+                appendSystemText(
+                    /** @type {Array<{type?: string, text?: string}> | undefined} */ (
+                        /** @type {*} */ (event)?.system
+                    ),
+                    context.join("\n\n")
+                )
+            }
+        })
+        registrations.push(reg)
+    }
+
+    return async () => {
+        await Promise.all(registrations.map((r) => r?.dispose?.()))
+    }
+}
+
 export default {
     id: "opencode-think-separator-plugin",
-    server: ThinkSeparator
+    server: ThinkSeparator,
+    setup: setupV2
 }
