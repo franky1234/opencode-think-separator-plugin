@@ -4,7 +4,7 @@
     "small_model": "opencode-go/deepseek-v4-flash",
     "default_agent": "orchestrator",
     "plugin": [
-        "superpowers@git+https://github.com/obra/superpowers.git#b36e0829c6d0140e93cfef2ca599b1b07d4a7797"
+        "superpowers@git+https://github.com/obra/superpowers.git#v7.0.0"
     ],
 
     "compaction": {
